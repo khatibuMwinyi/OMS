@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS payment_voucher_config (
 CREATE TABLE IF NOT EXISTS printed_letters (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
+  reference_number VARCHAR(50),
   description TEXT,
   pdf_path VARCHAR(500) NOT NULL,
   user_id INT NOT NULL,
@@ -151,6 +152,7 @@ CREATE TABLE IF NOT EXISTS letter_content (
 
 CREATE TABLE IF NOT EXISTS incoming_letters (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  reference_number VARCHAR(50),
   sender_name VARCHAR(255) NOT NULL,
   sender_organization VARCHAR(255),
   subject VARCHAR(255) NOT NULL,
