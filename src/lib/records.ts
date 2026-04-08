@@ -105,6 +105,7 @@ export type VoucherRecord = {
 export type LetterRecord = {
   id: number;
   name: string;
+  referenceNumber: string | null;
   description: string | null;
   pdfPath: string;
   letterDate: string | null;
@@ -118,6 +119,7 @@ export type LetterRecord = {
 
 export type IncomingLetterRecord = {
   id: number;
+  referenceNumber: string | null;
   senderName: string;
   senderOrganization: string | null;
   subject: string;
@@ -136,13 +138,42 @@ function scope(session: SessionUser): Scope {
     : { clause: " WHERE 1 = 1 AND user_id = ?", params: [session.userId] };
 }
 
+let printedLettersTableReady: Promise<void> | null = null;
 let incomingLettersTableReady: Promise<void> | null = null;
+
+function ensurePrintedLettersTable() {
+  if (!printedLettersTableReady) {
+    printedLettersTableReady = execute(`
+      CREATE TABLE IF NOT EXISTS printed_letters (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        reference_number VARCHAR(50),
+        description TEXT,
+        pdf_path VARCHAR(500) NOT NULL,
+        user_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        KEY idx_printed_letters_user_created (user_id, created_at),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `)
+      .then(() =>
+        execute(`
+          ALTER TABLE printed_letters
+          ADD COLUMN IF NOT EXISTS reference_number VARCHAR(50) NULL
+        `),
+      )
+      .then(() => undefined);
+  }
+
+  return printedLettersTableReady;
+}
 
 function ensureIncomingLettersTable() {
   if (!incomingLettersTableReady) {
     incomingLettersTableReady = execute(`
       CREATE TABLE IF NOT EXISTS incoming_letters (
         id INT AUTO_INCREMENT PRIMARY KEY,
+        reference_number VARCHAR(50),
         sender_name VARCHAR(255) NOT NULL,
         sender_organization VARCHAR(255),
         subject VARCHAR(255) NOT NULL,
@@ -168,6 +199,12 @@ function ensureIncomingLettersTable() {
         execute(`
           ALTER TABLE incoming_letters
           ADD COLUMN IF NOT EXISTS original_file_name VARCHAR(255) NULL
+        `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE incoming_letters
+          ADD COLUMN IF NOT EXISTS reference_number VARCHAR(50) NULL
         `),
       )
       .then(() => undefined);
@@ -235,25 +272,29 @@ function incrementSequentialNumber(value: string | null | undefined) {
 function incrementPrefixedSequentialNumber(
   value: string | null | undefined,
   prefix: string,
+  minimumDigits = 3,
 ) {
   const text = (value ?? "").trim();
   const numericSuffix = text.startsWith(prefix)
     ? text.slice(prefix.length)
-    : "";
+    : (text.match(/(\d+)$/)?.[1] ?? "");
   const parsed = Number(numericSuffix);
 
   if (numericSuffix && Number.isFinite(parsed)) {
-    return `${prefix}${String(parsed + 1).padStart(Math.max(numericSuffix.length, 3), "0")}`;
+    return `${prefix}${String(parsed + 1).padStart(Math.max(numericSuffix.length, minimumDigits), "0")}`;
   }
 
-  return `${prefix}001`;
+  return `${prefix}${String(1).padStart(minimumDigits, "0")}`;
 }
 
 async function getLatestReceiptNumber() {
   const record = await firstOrNull<{ receiptNumber: string }>(
     `SELECT receipt_number AS receiptNumber
      FROM receipts
-     ORDER BY CAST(receipt_number AS UNSIGNED) DESC, created_at DESC
+     ORDER BY CASE
+       WHEN receipt_number LIKE 'RC%' THEN CAST(SUBSTRING(receipt_number, 3) AS UNSIGNED)
+       ELSE CAST(receipt_number AS UNSIGNED)
+     END DESC, created_at DESC
      LIMIT 1`,
     [],
   );
@@ -265,7 +306,8 @@ async function getLatestVoucherNumber() {
   const record = await firstOrNull<{ voucherNumber: string }>(
     `SELECT voucher_number AS voucherNumber
      FROM payment_vouchers
-     ORDER BY CAST(voucher_number AS UNSIGNED) DESC, created_at DESC
+     WHERE voucher_number LIKE 'VN%'
+     ORDER BY CAST(SUBSTRING(voucher_number, 3) AS UNSIGNED) DESC, created_at DESC
      LIMIT 1`,
     [],
   );
@@ -299,8 +341,52 @@ async function getLatestPettyCashNumber() {
   return record?.pettyCashNumber ?? null;
 }
 
+async function getLatestLetterReferenceNumber() {
+  await ensurePrintedLettersTable();
+
+  const record = await firstOrNull<{ referenceNumber: string }>(
+    `SELECT COALESCE(
+       NULLIF(reference_number, ''),
+       CONCAT('LR', LPAD(id, 3, '0'))
+     ) AS referenceNumber
+     FROM printed_letters
+     ORDER BY CAST(
+       SUBSTRING(
+         COALESCE(NULLIF(reference_number, ''), CONCAT('LR', LPAD(id, 3, '0'))),
+         3
+       ) AS UNSIGNED
+     ) DESC, created_at DESC
+     LIMIT 1`,
+    [],
+  );
+
+  return record?.referenceNumber ?? null;
+}
+
+async function getLatestIncomingLetterReferenceNumber() {
+  await ensureIncomingLettersTable();
+
+  const record = await firstOrNull<{ referenceNumber: string }>(
+    `SELECT COALESCE(
+       NULLIF(reference_number, ''),
+       CONCAT('IL', LPAD(id, 3, '0'))
+     ) AS referenceNumber
+     FROM incoming_letters
+     ORDER BY CAST(
+       SUBSTRING(
+         COALESCE(NULLIF(reference_number, ''), CONCAT('IL', LPAD(id, 3, '0'))),
+         3
+       ) AS UNSIGNED
+     ) DESC, created_at DESC
+     LIMIT 1`,
+    [],
+  );
+
+  return record?.referenceNumber ?? null;
+}
+
 export async function getNextReceiptNumber() {
-  return incrementSequentialNumber(await getLatestReceiptNumber());
+  return incrementPrefixedSequentialNumber(await getLatestReceiptNumber(), "RC");
 }
 
 export async function getNextInvoiceNumber() {
@@ -311,13 +397,27 @@ export async function getNextInvoiceNumber() {
 }
 
 export async function getNextVoucherNumber() {
-  return incrementSequentialNumber(await getLatestVoucherNumber());
+  return incrementPrefixedSequentialNumber(await getLatestVoucherNumber(), "VN");
 }
 
 export async function getNextPettyCashNumber() {
   return incrementPrefixedSequentialNumber(
     await getLatestPettyCashNumber(),
     "PC",
+  );
+}
+
+export async function getNextLetterReferenceNumber() {
+  return incrementPrefixedSequentialNumber(
+    await getLatestLetterReferenceNumber(),
+    "LR",
+  );
+}
+
+export async function getNextIncomingLetterReferenceNumber() {
+  return incrementPrefixedSequentialNumber(
+    await getLatestIncomingLetterReferenceNumber(),
+    "IL",
   );
 }
 
@@ -462,12 +562,17 @@ export async function listLetters(
   period: ReportPeriod = "all",
   context?: ReportPeriodContext,
 ) {
+  await ensurePrintedLettersTable();
   const filterClause = session.role === "admin" ? "" : " AND pl.user_id = ?";
   const filterParams = session.role === "admin" ? [] : [session.userId];
   const periodFilter = buildReportPeriodScope("pl.created_at", period, context);
   return queryRows<LetterRecord>(
     `SELECT pl.id,
       pl.name,
+      COALESCE(
+        NULLIF(pl.reference_number, ''),
+        CONCAT('LR', LPAD(pl.id, 3, '0'))
+      ) AS referenceNumber,
       pl.description,
       pl.pdf_path AS pdfPath,
       lc.letter_date AS letterDate,
@@ -532,6 +637,48 @@ export async function getInvoiceDocument(
   return { invoice, items };
 }
 
+export async function getInvoiceDocumentPublic(invoiceId: number) {
+  const invoice = await firstOrNull<InvoiceRecord>(
+    `SELECT id,
+      invoice_number AS invoiceNumber,
+      tin,
+      invoice_date AS invoiceDate,
+      director AS customerName,
+      phone,
+      payment_method AS paymentMethod,
+      bank_account AS bankAccount,
+      holder_name AS holderName,
+      bank_name AS bankName,
+      mobile_number AS mobileNumber,
+      mobile_holder AS mobileHolder,
+      mobile_operator AS mobileOperator,
+      subtotal,
+      vat,
+      discount,
+      grand_total AS grandTotal,
+      user_id AS userId,
+      created_at AS createdAt
+     FROM invoices
+     WHERE id = ?
+     LIMIT 1`,
+    [invoiceId],
+  );
+
+  if (!invoice) {
+    return null;
+  }
+
+  const items = await queryRows<InvoiceItemRecord>(
+    `SELECT id, description, quantity, unit_price AS unitPrice, total
+     FROM invoice_items
+     WHERE invoice_id = ?
+     ORDER BY id ASC`,
+    [invoiceId],
+  ).catch(() => []);
+
+  return { invoice, items };
+}
+
 export async function getReceiptDocument(
   session: SessionUser,
   receiptId: number,
@@ -558,6 +705,31 @@ export async function getReceiptDocument(
      WHERE id = ?${accessClause}
      LIMIT 1`,
     session.role === "admin" ? [receiptId] : [receiptId, session.userId],
+  );
+}
+
+export async function getReceiptDocumentPublic(receiptId: number) {
+  return firstOrNull<ReceiptRecord>(
+    `SELECT id,
+      receipt_number AS receiptNumber,
+      customer_name AS customerName,
+      code,
+      type,
+      category,
+      description,
+      phone,
+      amount,
+      payment_method AS paymentMethod,
+      bank_name AS bankName,
+      branch_name AS branchName,
+      reference_number AS referenceNumber,
+      receipt_date AS receiptDate,
+      user_id AS userId,
+      created_at AS createdAt
+     FROM receipts
+     WHERE id = ?
+     LIMIT 1`,
+    [receiptId],
   );
 }
 
@@ -627,10 +799,15 @@ export async function getLetterDocument(
   session: SessionUser,
   letterId: number,
 ) {
+  await ensurePrintedLettersTable();
   const accessClause = session.role === "admin" ? "" : " AND pl.user_id = ?";
   const letter = await firstOrNull<LetterRecord>(
     `SELECT pl.id,
       pl.name,
+      COALESCE(
+        NULLIF(pl.reference_number, ''),
+        CONCAT('LR', LPAD(pl.id, 3, '0'))
+      ) AS referenceNumber,
       pl.description,
       pl.pdf_path AS pdfPath,
       lc.letter_date AS letterDate,
@@ -661,6 +838,10 @@ export async function listIncomingLetters(
   const periodFilter = buildReportPeriodScope("received_date", period, context);
   return queryRows<IncomingLetterRecord>(
     `SELECT id,
+      COALESCE(
+        NULLIF(reference_number, ''),
+        CONCAT('IL', LPAD(id, 3, '0'))
+      ) AS referenceNumber,
       sender_name AS senderName,
       sender_organization AS senderOrganization,
       subject,
@@ -686,6 +867,10 @@ export async function getIncomingLetterDocument(
   const filter = scope(session);
   const letter = await queryRows<IncomingLetterRecord>(
     `SELECT id,
+      COALESCE(
+        NULLIF(reference_number, ''),
+        CONCAT('IL', LPAD(id, 3, '0'))
+      ) AS referenceNumber,
       sender_name AS senderName,
       sender_organization AS senderOrganization,
       subject,

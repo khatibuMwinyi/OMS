@@ -142,12 +142,12 @@ export async function buildReceiptPdf(document: ReceiptRecord) {
   });
 
   // Header Right
-  page.drawText(`#R${document.receiptNumber}`, {
+  page.drawText(`#${document.receiptNumber}`, {
     x: rightLabelX,
     y: pageHeight - 74,
     size: 20,
     font: boldFont,
-    color: rgb(0.72, 0.5, 0.22), // Matching the brown/gold accent from invoice
+    color: rgb(0.86, 0.42, 0.1), // Stronger brown/gold ribbon accent
   });
 
   page.drawText(receiptDate.toUpperCase(), {

@@ -148,7 +148,7 @@ export async function buildPettyCashPdf(document: PettyCashRecord) {
     y: pageHeight - 74,
     size: 20,
     font: boldFont,
-    color: rgb(0.72, 0.5, 0.22),
+    color: rgb(0.86, 0.42, 0.1),
   });
 
   page.drawText(formatDate(document.date).toUpperCase(), {

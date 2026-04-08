@@ -108,6 +108,7 @@ export async function buildFormalLetterPdf(
   document: Pick<
     LetterRecord,
     | "name"
+    | "referenceNumber"
     | "description"
     | "letterDate"
     | "receiverAddress"
@@ -128,6 +129,17 @@ export async function buildFormalLetterPdf(
   const bodyWidth = 465;
 
   const dateText = formatDisplayDate(document.letterDate);
+  const referenceText = `REF: ${document.referenceNumber?.trim() || "-"}`;
+  const referenceSize = 10.5;
+  const referenceWidth = boldFont.widthOfTextAtSize(referenceText, referenceSize);
+  page.drawText(referenceText.toUpperCase(), {
+    x: pageWidth - rightMargin - referenceWidth,
+    y: pageHeight - 192,
+    size: referenceSize,
+    font: boldFont,
+    color: dark,
+  });
+
   const dateSize = 12.5;
   const dateWidth = boldFont.widthOfTextAtSize(dateText, dateSize);
 
@@ -307,6 +319,7 @@ export async function buildFormalLetterPdf(
 export async function buildIncomingLetterPdf(
   document: Pick<
     IncomingLetterRecord,
+    | "referenceNumber"
     | "senderName"
     | "senderOrganization"
     | "subject"
@@ -319,7 +332,7 @@ export async function buildIncomingLetterPdf(
   const page = pdfDoc.getPages()[0];
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const accent = rgb(0.72, 0.5, 0.22);
+  const accent = rgb(0.86, 0.42, 0.1);
   const dark = rgb(0.16, 0.18, 0.24);
   const muted = rgb(0.38, 0.4, 0.46);
 
@@ -360,6 +373,14 @@ export async function buildIncomingLetterPdf(
   page.drawText(`Date: ${formatDisplayDate(document.receivedDate)}`, {
     x: pageWidth - 182,
     y: pageHeight - 122,
+    size: 11,
+    font: regularFont,
+    color: muted,
+  });
+
+  page.drawText(`Reference: ${document.referenceNumber?.trim() || "-"}`, {
+    x: pageWidth - 182,
+    y: pageHeight - 138,
     size: 11,
     font: regularFont,
     color: muted,

@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
+import { SESSION_IDLE_TIMEOUT_MS } from "./session-config";
+
 export type UserRole = "admin" | "secretary";
 
 export type SessionUser = {
@@ -11,7 +13,7 @@ export type SessionUser = {
 };
 
 export const SESSION_COOKIE_NAME = "oweru_session";
-const SESSION_TTL_MS = 1000 * 60 * 30;
+const SESSION_TTL_MS = SESSION_IDLE_TIMEOUT_MS;
 
 function getSessionSecret() {
   return process.env.SESSION_SECRET ?? "oweru-development-session-secret";
