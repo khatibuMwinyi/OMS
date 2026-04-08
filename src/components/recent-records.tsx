@@ -20,7 +20,13 @@ type RecentRecordsProps = {
     details: string;
     value: string;
   };
-  getShareMessage?: (item: RecordItem, downloadHref: string | null) => string;
+  getShareDocument?: (item: RecordItem) =>
+    | {
+        type: "invoice" | "receipt";
+        title?: string;
+        summary?: string;
+      }
+    | null;
   getEditHref?: (item: RecordItem) => string;
   getPreviewHref?: (item: RecordItem) => string | null | undefined;
   getDownloadHref?: (item: RecordItem) => string | null | undefined;
@@ -54,13 +60,13 @@ export async function RecentRecords({
     details: "Details",
     value: "Value",
   },
-  getShareMessage,
+  getShareDocument,
   getEditHref,
   getPreviewHref,
   getDownloadHref,
 }: RecentRecordsProps) {
   const hasActions =
-    typeof getShareMessage === "function" ||
+    typeof getShareDocument === "function" ||
     typeof getEditHref === "function" ||
     typeof getDownloadHref === "function";
   const origin = await getRequestOrigin();
@@ -103,62 +109,65 @@ export async function RecentRecords({
               </thead>
               <tbody>
                 {items.map((item) => {
-                    const downloadHref = getDownloadHref ? getDownloadHref(item) ?? null : null;
-                    const previewHref = getPreviewHref
-                      ? getPreviewHref(item) ?? null
-                      : downloadHref
-                        ? appendPreviewParam(downloadHref)
-                        : null;
+                  const downloadHref = getDownloadHref
+                    ? getDownloadHref(item) ?? null
+                    : null;
+                  const previewHref = getPreviewHref
+                    ? getPreviewHref(item) ?? null
+                    : downloadHref
+                      ? appendPreviewParam(downloadHref)
+                      : null;
+                  const shareDocument = getShareDocument
+                    ? getShareDocument(item)
+                    : null;
 
-                    return (
-                  <tr
-                    className="border-b border-border/60 last:border-b-0 hover:bg-slate-50/80"
-                    key={`${title}-${item.id}`}
-                  >
-                    <td
-                      data-label={columns.record}
-                      className="px-4 py-4 align-top text-sm font-semibold text-slate-950"
+                  return (
+                    <tr
+                      className="border-b border-border/60 last:border-b-0 hover:bg-slate-50/80"
+                      key={`${title}-${item.id}`}
                     >
-                      {item.title}
-                    </td>
-                    <td
-                      data-label={columns.details}
-                      className="px-4 py-4 align-top text-sm text-slate-600"
-                    >
-                      {item.subtitle}
-                    </td>
-                    <td
-                      data-label={columns.value}
-                      className="px-4 py-4 align-top text-right text-sm font-semibold text-slate-900"
-                    >
-                      {item.value}
-                    </td>
-                    {hasActions ? (
                       <td
-                        data-label="Action"
-                        className="px-4 py-4 align-top text-right"
+                        data-label={columns.record}
+                        className="px-4 py-4 align-top text-sm font-semibold text-slate-950"
                       >
-                        <RecordActionButtons
-                          shareHref={
-                            getShareMessage
-                              ? `https://wa.me/?text=${encodeURIComponent(
-                                  getShareMessage(
-                                    item,
-                                    downloadHref
-                                      ? new URL(downloadHref, origin).toString()
-                                      : null,
-                                  ),
-                                )}`
-                              : null
-                          }
-                          editHref={getEditHref ? getEditHref(item) : null}
-                          previewHref={previewHref}
-                          downloadHref={downloadHref}
-                        />
+                        {item.title}
                       </td>
-                    ) : null}
-                  </tr>
-                    );
+                      <td
+                        data-label={columns.details}
+                        className="px-4 py-4 align-top text-sm text-slate-600"
+                      >
+                        {item.subtitle}
+                      </td>
+                      <td
+                        data-label={columns.value}
+                        className="px-4 py-4 align-top text-right text-sm font-semibold text-slate-900"
+                      >
+                        {item.value}
+                      </td>
+                      {hasActions ? (
+                        <td
+                          data-label="Action"
+                          className="px-4 py-4 align-top text-right"
+                        >
+                          <RecordActionButtons
+                            shareDocument={
+                              shareDocument
+                                ? {
+                                    type: shareDocument.type,
+                                    id: item.id,
+                                    title: shareDocument.title ?? item.title,
+                                    summary: shareDocument.summary ?? item.subtitle,
+                                  }
+                                : null
+                            }
+                            editHref={getEditHref ? getEditHref(item) : null}
+                            previewHref={previewHref}
+                            downloadHref={downloadHref}
+                          />
+                        </td>
+                      ) : null}
+                    </tr>
+                  );
                 })}
               </tbody>
             </table>

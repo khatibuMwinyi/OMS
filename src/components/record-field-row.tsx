@@ -9,11 +9,16 @@ type RecordFieldRowProps = {
   className?: string;
 };
 
-export function RecordFieldRow({ label, helper, children, className }: RecordFieldRowProps) {
+export function RecordFieldRow({
+  label,
+  helper,
+  children,
+  className,
+}: RecordFieldRowProps) {
   return (
     <div
       className={cn(
-        "grid gap-4 border-b border-border/70 px-5 py-4 last:border-b-0 md:grid-cols-[220px_minmax(0,1fr)] md:items-start",
+        "grid gap-4 border-b border-border/70 px-5 py-4 last:border-b-0 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start",
         className,
       )}
     >

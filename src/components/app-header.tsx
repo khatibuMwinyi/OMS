@@ -18,6 +18,7 @@ import {
 import { logoutAction } from "@/app/actions/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SessionActivityMonitor } from "@/components/session-activity-monitor";
 import type { SessionUser } from "@/lib/session";
 
 const navigation = [
@@ -48,6 +49,32 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
     setIsMobileMenuOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    if (!isMobileMenuOpen) {
+      return;
+    }
+
+    const scrollY = window.scrollY;
+    const { style } = document.body;
+    const originalPosition = style.position;
+    const originalTop = style.top;
+    const originalWidth = style.width;
+    const originalOverflow = style.overflow;
+
+    style.position = "fixed";
+    style.top = `-${scrollY}px`;
+    style.width = "100%";
+    style.overflow = "hidden";
+
+    return () => {
+      style.position = originalPosition;
+      style.top = originalTop;
+      style.width = originalWidth;
+      style.overflow = originalOverflow;
+      window.scrollTo(0, scrollY);
+    };
+  }, [isMobileMenuOpen]);
+
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
   };
@@ -70,7 +97,9 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
 
   return (
     <>
-      <header className="mobile-topbar md:hidden">
+      <SessionActivityMonitor />
+
+      <header className="mobile-topbar lg:hidden">
         <div className="dashboard-brand">
           <Image
             className="brand-mark"
@@ -89,18 +118,18 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
         <button
           type="button"
           className="sidebar-trigger"
-          aria-label="Toggle navigation menu"
+          aria-label="Open navigation menu"
           aria-expanded={isMobileMenuOpen}
           aria-controls="mobile-navigation"
-          onClick={() => setIsMobileMenuOpen((current) => !current)}
+          onClick={() => setIsMobileMenuOpen(true)}
         >
-          {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          <Menu size={20} />
         </button>
       </header>
 
       <button
         type="button"
-        className={`sidebar-backdrop md:hidden${isMobileMenuOpen ? " is-open" : ""}`}
+        className={`sidebar-backdrop lg:hidden${isMobileMenuOpen ? " is-open" : ""}`}
         aria-label="Close navigation menu"
         aria-hidden={!isMobileMenuOpen}
         tabIndex={-1}
@@ -109,22 +138,33 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
 
       <aside
         id="mobile-navigation"
-        className={`mobile-sidebar md:hidden${isMobileMenuOpen ? " is-open" : ""}`}
+        className={`mobile-sidebar lg:hidden${isMobileMenuOpen ? " is-open" : ""}`}
         aria-label="Primary mobile"
         aria-hidden={!isMobileMenuOpen}
       >
-        <div className="sidebar-brand sidebar-brand--mobile border-b border-border pb-4">
-          <Image
-            className="brand-mark"
-            src="/oweru.jpeg"
-            alt="Oweru International logo"
-            width={48}
-            height={48}
-          />
-          <div className="brand-name">
-            <strong>OWERU</strong>
-            <span>Management System</span>
+        <div className="mobile-sidebar-header border-b border-border pb-4">
+          <div className="sidebar-brand sidebar-brand--mobile">
+            <Image
+              className="brand-mark"
+              src="/oweru.jpeg"
+              alt="Oweru International logo"
+              width={48}
+              height={48}
+            />
+            <div className="brand-name">
+              <strong>OWERU</strong>
+              <span>Management System</span>
+            </div>
           </div>
+
+          <button
+            type="button"
+            className="sidebar-close"
+            aria-label="Close navigation menu"
+            onClick={closeMobileMenu}
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <nav className="sidebar-nav">{navigationLinks}</nav>
@@ -132,14 +172,19 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
         <div className="sidebar-footer sidebar-footer--mobile">
           <Badge variant="warning">{session.role.toUpperCase()} ACCESS</Badge>
           <form action={logoutAction}>
-            <Button variant="outline" size="sm" type="submit" className="w-full">
+            <Button
+              variant="outline"
+              size="sm"
+              type="submit"
+              className="w-full text-white hover:text-white"
+            >
               Logout
             </Button>
           </form>
         </div>
       </aside>
 
-      <aside className="desktop-sidebar hidden md:flex" aria-label="Primary">
+      <aside className="desktop-sidebar hidden lg:flex" aria-label="Primary">
         <div className="sidebar-brand">
           <Image
             className="brand-mark"
@@ -164,7 +209,12 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
 
         <div className="sidebar-footer">
           <form action={logoutAction}>
-            <Button variant="outline" size="sm" type="submit" className="w-full">
+            <Button
+              variant="outline"
+              size="sm"
+              type="submit"
+              className="w-full text-white hover:text-white"
+            >
               Logout
             </Button>
           </form>
