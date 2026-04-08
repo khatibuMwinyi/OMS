@@ -66,27 +66,6 @@ export default async function DashboardPage() {
       ].join("\n"),
     ]),
   );
-  const pettyCashSummaries = new Map(
-    overview.recentPettyCash.map((item) => [
-      item.id,
-      [
-        `Petty cash ${item.pettycashNumber ?? item.code ?? item.referenceNumber ?? item.id}`,
-        `Description: ${item.description}`,
-        `Date: ${formatDate(item.date)}`,
-        `Amount: ${formatTZS(Number(item.amount ?? 0))}`,
-      ].join("\n"),
-    ]),
-  );
-  const letterSummaries = new Map(
-    overview.recentLetters.map((item) => [
-      item.id,
-      [
-        `Letter ${item.name}`,
-        `Subject: ${item.description ? item.description.slice(0, 90) : "No subject stored"}`,
-        `Created: ${formatDate(item.createdAt)}`,
-      ].join("\n"),
-    ]),
-  );
 
   return (
     <main className="dashboard-shell">
@@ -136,12 +115,15 @@ export default async function DashboardPage() {
                   details: "Customer",
                   value: "Amount",
                 }}
-                getShareMessage={(item, downloadUrl) => {
+                getShareDocument={(item) => {
                   const summary =
                     invoiceSummaries.get(item.id) ?? `Invoice ${item.title}`;
-                  return downloadUrl
-                    ? `${summary}\nDownload PDF: ${downloadUrl}`
-                    : summary;
+
+                  return {
+                    type: "invoice",
+                    title: `Invoice ${item.title}`,
+                    summary,
+                  };
                 }}
                 getEditHref={(item) => `/invoices?edit=${item.id}`}
                 getDownloadHref={(item) => `/api/export/invoice/${item.id}`}
@@ -161,12 +143,15 @@ export default async function DashboardPage() {
                   details: "Customer",
                   value: "Amount",
                 }}
-                getShareMessage={(item, downloadUrl) => {
+                getShareDocument={(item) => {
                   const summary =
                     receiptSummaries.get(item.id) ?? `Receipt ${item.title}`;
-                  return downloadUrl
-                    ? `${summary}\nDownload PDF: ${downloadUrl}`
-                    : summary;
+
+                  return {
+                    type: "receipt",
+                    title: `Receipt ${item.title}`,
+                    summary,
+                  };
                 }}
                 getEditHref={(item) => `/receipts?edit=${item.id}`}
                 getDownloadHref={(item) => `/api/export/receipt/${item.id}`}
@@ -187,14 +172,6 @@ export default async function DashboardPage() {
                   value: "Amount",
                 }}
                 getDownloadHref={(item) => `/api/export/petty-cash-voucher/${item.id}`}
-                getShareMessage={(item, downloadUrl) => {
-                  const summary =
-                    pettyCashSummaries.get(item.id) ??
-                    `Petty cash ${item.title}`;
-                  return downloadUrl
-                    ? `${summary}\nDownload PDF: ${downloadUrl}`
-                    : summary;
-                }}
                 items={overview.recentPettyCash.map((item) => ({
                   id: item.id,
                   title: item.pettycashNumber || item.code || item.referenceNumber || item.description,
@@ -227,13 +204,6 @@ export default async function DashboardPage() {
                   record: "Recipient",
                   details: "Subject",
                   value: "Created",
-                }}
-                getShareMessage={(item, downloadUrl) => {
-                  const summary =
-                    letterSummaries.get(item.id) ?? `Letter ${item.title}`;
-                  return downloadUrl
-                    ? `${summary}\nDownload PDF: ${downloadUrl}`
-                    : summary;
                 }}
                 getEditHref={(item) => `/letters?edit=${item.id}`}
                 getDownloadHref={(item) => `/api/export/letter/${item.id}`}

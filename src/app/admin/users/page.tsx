@@ -48,7 +48,10 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
           </div>
         </section>
 
-        <RouteToast status={resolvedSearchParams.status} error={resolvedSearchParams.error} />
+        <RouteToast
+          status={resolvedSearchParams.status}
+          error={resolvedSearchParams.error}
+        />
 
         <section className="module-grid module-grid--single">
           <section className="section-card form-card">
@@ -59,7 +62,10 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
               </div>
             </div>
 
-            <form action={createUserAction} className="form-grid form-grid--wide">
+            <form
+              action={createUserAction}
+              className="form-grid form-grid--wide"
+            >
               <label className="space-y-2">
                 <span className="field-label">Username</span>
                 <Input name="username" autoComplete="off" required />
@@ -75,7 +81,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                   <option value="admin">Admin</option>
                 </Select>
               </label>
-              <div className="button-row md:col-span-2">
+              <div className="button-row lg:col-span-2">
                 <Button type="submit">Add user</Button>
               </div>
             </form>
@@ -89,27 +95,59 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-3xl border border-border bg-white">
-              <div className="grid grid-cols-[1.3fr_0.8fr_0.9fr] gap-4 border-b border-border/70 px-5 py-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                <span>Username</span>
-                <span>Role</span>
-                <span>Created</span>
-              </div>
-              <div className="divide-y divide-border/70">
-                {users.map((user) => (
-                  <div
-                    key={user.id}
-                    className="grid grid-cols-[1.3fr_0.8fr_0.9fr] gap-4 px-5 py-4 text-sm text-slate-700"
-                  >
-                    <span className="font-medium text-slate-950">{user.username}</span>
-                    <span>{user.role}</span>
-                    <span>{formatDate(user.createdAt)}</span>
-                  </div>
-                ))}
-                {!users.length ? (
-                  <div className="px-5 py-8 text-sm text-slate-500">No users found.</div>
-                ) : null}
-              </div>
+            <div className="record-table-wrapper">
+              <table className="record-table">
+                <thead>
+                  <tr className="border-b border-border/70">
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                      Username
+                    </th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                      Role
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                      Created
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((user) => (
+                    <tr
+                      key={user.id}
+                      className="border-b border-border/60 last:border-b-0 hover:bg-slate-50/80"
+                    >
+                      <td
+                        data-label="Username"
+                        className="px-4 py-4 align-top text-sm font-semibold text-slate-950"
+                      >
+                        {user.username}
+                      </td>
+                      <td
+                        data-label="Role"
+                        className="px-4 py-4 align-top text-sm text-slate-700"
+                      >
+                        {user.role}
+                      </td>
+                      <td
+                        data-label="Created"
+                        className="px-4 py-4 align-top text-right text-sm text-slate-700"
+                      >
+                        {formatDate(user.createdAt)}
+                      </td>
+                    </tr>
+                  ))}
+                  {!users.length ? (
+                    <tr>
+                      <td
+                        className="px-4 py-8 text-sm text-slate-500"
+                        colSpan={3}
+                      >
+                        No users found.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
             </div>
           </section>
         </section>

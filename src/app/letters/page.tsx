@@ -40,6 +40,16 @@ type PageProps = {
     date?: string;
     month?: string;
     week?: string;
+    letters_period?: string;
+    letters_date?: string;
+    letters_month?: string;
+    letters_week?: string;
+    letters_q?: string;
+    incoming_period?: string;
+    incoming_date?: string;
+    incoming_month?: string;
+    incoming_week?: string;
+    incoming_q?: string;
   }>;
 };
 
@@ -50,12 +60,32 @@ export default async function LettersPage({ searchParams }: PageProps) {
   }
 
   const resolvedSearchParams = (await searchParams) ?? {};
-  const reportPeriod = normalizeReportPeriod(resolvedSearchParams.period);
-  const reportContext = {
-    date: resolvedSearchParams.date ?? null,
-    month: resolvedSearchParams.month ?? null,
-    week: resolvedSearchParams.week ?? null,
+  const lettersPeriod = normalizeReportPeriod(
+    resolvedSearchParams.letters_period ?? resolvedSearchParams.period,
+  );
+  const lettersContext = {
+    date: resolvedSearchParams.letters_date ?? resolvedSearchParams.date ?? null,
+    month:
+      resolvedSearchParams.letters_month ?? resolvedSearchParams.month ?? null,
+    week: resolvedSearchParams.letters_week ?? resolvedSearchParams.week ?? null,
   };
+  const incomingPeriod = normalizeReportPeriod(
+    resolvedSearchParams.incoming_period ?? resolvedSearchParams.period,
+  );
+  const incomingContext = {
+    date:
+      resolvedSearchParams.incoming_date ?? resolvedSearchParams.date ?? null,
+    month:
+      resolvedSearchParams.incoming_month ?? resolvedSearchParams.month ?? null,
+    week:
+      resolvedSearchParams.incoming_week ?? resolvedSearchParams.week ?? null,
+  };
+  const lettersQuery = (resolvedSearchParams.letters_q ?? "")
+    .trim()
+    .toLowerCase();
+  const incomingQuery = (resolvedSearchParams.incoming_q ?? "")
+    .trim()
+    .toLowerCase();
 
   const editId = Number(resolvedSearchParams.edit);
   const isEditing = Number.isFinite(editId) && editId > 0;
@@ -69,18 +99,51 @@ export default async function LettersPage({ searchParams }: PageProps) {
 
   const letters = await listLetters(
     session,
-    20,
-    reportPeriod,
-    reportContext,
+    1000,
+    lettersPeriod,
+    lettersContext,
   );
   const incomingLetters = await listIncomingLetters(
     session,
-    20,
-    reportPeriod,
-    reportContext,
+    1000,
+    incomingPeriod,
+    incomingContext,
   );
+  const filteredLetters = letters
+    .filter((item) => {
+      if (!lettersQuery) {
+        return true;
+      }
+
+      return [
+        item.referenceNumber,
+        item.name,
+        item.description,
+        item.heading,
+      ]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(lettersQuery));
+    })
+    .slice(0, 20);
+  const filteredIncomingLetters = incomingLetters
+    .filter((item) => {
+      if (!incomingQuery) {
+        return true;
+      }
+
+      return [
+        item.referenceNumber,
+        item.senderName,
+        item.senderOrganization,
+        item.subject,
+        item.category,
+      ]
+        .filter(Boolean)
+        .some((value) => value!.toLowerCase().includes(incomingQuery));
+    })
+    .slice(0, 20);
   const incomingLetterDownloadPaths = new Map(
-    incomingLetters.map((item) => [item.id, item.pdfPath]),
+    filteredIncomingLetters.map((item) => [item.id, item.pdfPath]),
   );
   const letterBodyParts = splitLetterBody(editDocument?.body);
 
@@ -105,15 +168,6 @@ export default async function LettersPage({ searchParams }: PageProps) {
         <RouteToast
           status={resolvedSearchParams.status}
           error={resolvedSearchParams.error}
-        />
-
-        <ReportPeriodTabs
-          basePath="/letters"
-          value={reportPeriod}
-          date={resolvedSearchParams.date ?? ""}
-          month={resolvedSearchParams.month ?? ""}
-          week={resolvedSearchParams.week ?? ""}
-          className="flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-white p-4"
         />
 
         <section className="module-grid module-grid--single">
@@ -219,9 +273,36 @@ export default async function LettersPage({ searchParams }: PageProps) {
               </div>
             </div>
 
+            <ReportPeriodTabs
+              basePath="/letters"
+              queryKeyPrefix="letters"
+              value={lettersPeriod}
+              date={resolvedSearchParams.letters_date ?? ""}
+              month={resolvedSearchParams.letters_month ?? ""}
+              week={resolvedSearchParams.letters_week ?? ""}
+              searchParamKey="letters_q"
+              defaultSearchQuery={resolvedSearchParams.letters_q ?? ""}
+              searchPlaceholder="Search recipient, subject, or reference"
+              downloadOptions={
+                session.role === "admin"
+                  ? [
+                      {
+                        label: "Download letters report",
+                        href: "/api/export/report/letters",
+                      },
+                    ]
+                  : undefined
+              }
+              className="mb-4 flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-white p-4"
+            />
+
             <RecentRecords
               title="Letters"
-              emptyText="No printed letters found yet."
+              emptyText={
+                lettersQuery
+                  ? "No printed letters match your search/filter."
+                  : "No printed letters found yet."
+              }
               columns={{
                 record: "Recipient",
                 details: "Subject",
@@ -229,12 +310,14 @@ export default async function LettersPage({ searchParams }: PageProps) {
               }}
               getEditHref={(item) => `/letters?edit=${item.id}`}
               getDownloadHref={(item) => `/api/export/letter/${item.id}`}
-              items={letters.map((item) => ({
+              items={filteredLetters.map((item) => ({
                 id: item.id,
-                title: item.name,
-                subtitle: item.description
-                  ? item.description.slice(0, 90)
-                  : "No subject stored",
+                title: item.referenceNumber ?? item.name,
+                subtitle: `${item.name} · ${
+                  item.description
+                    ? item.description.slice(0, 90)
+                    : "No subject stored"
+                }`,
                 value: formatDate(item.createdAt),
               }))}
             />
@@ -312,9 +395,36 @@ export default async function LettersPage({ searchParams }: PageProps) {
                 </form>
               </div>
 
+              <ReportPeriodTabs
+                basePath="/letters"
+                queryKeyPrefix="incoming"
+                value={incomingPeriod}
+                date={resolvedSearchParams.incoming_date ?? ""}
+                month={resolvedSearchParams.incoming_month ?? ""}
+                week={resolvedSearchParams.incoming_week ?? ""}
+                searchParamKey="incoming_q"
+                defaultSearchQuery={resolvedSearchParams.incoming_q ?? ""}
+                searchPlaceholder="Search sender, subject, or reference"
+                downloadOptions={
+                  session.role === "admin"
+                    ? [
+                        {
+                          label: "Download incoming letters report",
+                          href: "/api/export/report/incoming-letters",
+                        },
+                      ]
+                    : undefined
+                }
+                className="flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-white p-4"
+              />
+
               <RecentRecords
                 title="Received letters"
-                emptyText="No incoming letters recorded yet."
+                emptyText={
+                  incomingQuery
+                    ? "No incoming letters match your search/filter."
+                    : "No incoming letters recorded yet."
+                }
                 columns={{
                   record: "Sender",
                   details: "Subject",
@@ -325,12 +435,12 @@ export default async function LettersPage({ searchParams }: PageProps) {
                     ? `/api/export/incoming-letter/${item.id}`
                     : null
                 }
-                items={incomingLetters.map((item) => ({
+                items={filteredIncomingLetters.map((item) => ({
                   id: item.id,
-                  title: item.senderName,
+                  title: item.referenceNumber ?? item.senderName,
                   subtitle: item.senderOrganization
-                    ? `${item.senderOrganization} · ${item.subject}`
-                    : item.subject,
+                    ? `${item.senderName} · ${item.senderOrganization} · ${item.subject}`
+                    : `${item.senderName} · ${item.subject}`,
                   value: formatDate(item.receivedDate),
                 }))}
               />

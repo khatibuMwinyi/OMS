@@ -101,7 +101,7 @@ export default async function PaymentVouchersPage({ searchParams }: PageProps) {
             >
               <VoucherFormFields voucherNumber={nextVoucherNumber} />
 
-              <div className="button-row md:col-span-2">
+              <div className="button-row lg:col-span-2">
                 <Button type="submit">Save payment voucher</Button>
               </div>
             </form>
@@ -121,6 +121,16 @@ export default async function PaymentVouchersPage({ searchParams }: PageProps) {
               date={resolvedSearchParams.date ?? ""}
               month={resolvedSearchParams.month ?? ""}
               week={resolvedSearchParams.week ?? ""}
+              downloadOptions={
+                session.role === "admin"
+                  ? [
+                      {
+                        label: "Download payment vouchers report",
+                        href: "/api/export/report/payment-vouchers",
+                      },
+                    ]
+                  : undefined
+              }
               className="mb-4 flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-white p-4"
             />
 

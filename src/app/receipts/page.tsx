@@ -136,6 +136,16 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
               date={resolvedSearchParams.date ?? ""}
               month={resolvedSearchParams.month ?? ""}
               week={resolvedSearchParams.week ?? ""}
+              downloadOptions={
+                session.role === "admin"
+                  ? [
+                      {
+                        label: "Download receipts report",
+                        href: "/api/export/report/receipts",
+                      },
+                    ]
+                  : undefined
+              }
               className="mb-4 flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-white p-4"
             />
 
@@ -147,12 +157,15 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
                 details: "Customer",
                 value: "Amount",
               }}
-              getShareMessage={(item, downloadUrl) => {
+              getShareDocument={(item) => {
                 const summary =
                   receiptSummaries.get(item.id) ?? `Receipt ${item.title}`;
-                return downloadUrl
-                  ? `${summary}\nDownload PDF: ${downloadUrl}`
-                  : summary;
+
+                return {
+                  type: "receipt",
+                  title: `Receipt ${item.title}`,
+                  summary,
+                };
               }}
               getEditHref={(item) => `/receipts?edit=${item.id}`}
               getDownloadHref={(item) => `/api/export/receipt/${item.id}`}

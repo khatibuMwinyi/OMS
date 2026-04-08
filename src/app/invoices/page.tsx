@@ -183,7 +183,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
                   required
                 />
               </label>
-              <label className="space-y-2 md:col-span-2">
+              <label className="space-y-2 lg:col-span-2">
                 <span className="field-label">VAT (optional)</span>
                 <Input
                   name="vat"
@@ -199,7 +199,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
                 />
               </label>
 
-              <div className="md:col-span-2 overflow-hidden rounded-3xl border border-border bg-white">
+              <div className="lg:col-span-2 overflow-hidden rounded-3xl border border-border bg-white">
                 <div className="border-b border-border/70 px-5 py-4">
                   <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
                     Payment information
@@ -227,7 +227,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
                 </div>
               </div>
 
-              <div className="md:col-span-2">
+              <div className="lg:col-span-2">
                 <InvoiceItemsField
                   key={
                     editDocument
@@ -238,7 +238,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
                 />
               </div>
 
-              <div className="button-row md:col-span-2">
+              <div className="button-row lg:col-span-2">
                 <Button type="submit">
                   {isEditing ? "Update invoice" : "Save invoice"}
                 </Button>
@@ -260,6 +260,16 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
               date={resolvedSearchParams.date ?? ""}
               month={resolvedSearchParams.month ?? ""}
               week={resolvedSearchParams.week ?? ""}
+              downloadOptions={
+                session.role === "admin"
+                  ? [
+                      {
+                        label: "Download invoices report",
+                        href: "/api/export/report/invoices",
+                      },
+                    ]
+                  : undefined
+              }
               className="mb-4 flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-white p-4"
             />
 
@@ -271,12 +281,15 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
                 details: "Customer",
                 value: "Amount",
               }}
-              getShareMessage={(item, downloadUrl) => {
+              getShareDocument={(item) => {
                 const summary =
                   invoiceSummaries.get(item.id) ?? `Invoice ${item.title}`;
-                return downloadUrl
-                  ? `${summary}\nDownload PDF: ${downloadUrl}`
-                  : summary;
+
+                return {
+                  type: "invoice",
+                  title: `Invoice ${item.title}`,
+                  summary,
+                };
               }}
               getEditHref={(item) => `/invoices?edit=${item.id}`}
               getDownloadHref={(item) => `/api/export/invoice/${item.id}`}
