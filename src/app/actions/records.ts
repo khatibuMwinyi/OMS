@@ -10,7 +10,12 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { execute, withTransaction } from "@/lib/db";
-import { getNextInvoiceNumber, getNextPettyCashNumber } from "@/lib/records";
+import {
+  getNextIncomingLetterReferenceNumber,
+  getNextInvoiceNumber,
+  getNextLetterReferenceNumber,
+  getNextPettyCashNumber,
+} from "@/lib/records";
 import {
   FIXED_BANK_ACCOUNT_NAME,
   FIXED_BANK_ACCOUNT_NUMBER,
@@ -790,6 +795,7 @@ const letterSchema = z.object({
 
 export async function createLetterAction(formData: FormData) {
   const session = await requireSession();
+  const referenceNumber = await getNextLetterReferenceNumber();
   const parsed = letterSchema.safeParse({
     recipient_name: formData.get("recipient_name"),
     recipient_address: formData.get("recipient_address"),
@@ -808,10 +814,11 @@ export async function createLetterAction(formData: FormData) {
 
   await withTransaction(async (connection) => {
     const [result] = await connection.execute<ResultSetHeader>(
-      `INSERT INTO printed_letters (name, description, pdf_path, user_id)
-       VALUES (?, ?, ?, ?)`,
+      `INSERT INTO printed_letters (name, reference_number, description, pdf_path, user_id)
+       VALUES (?, ?, ?, ?, ?)`,
       [
         parsed.data.recipient_name,
+        referenceNumber,
         parsed.data.subject,
         "generated",
         session.userId,
@@ -912,6 +919,7 @@ const incomingLetterSchema = z.object({
 
 export async function createIncomingLetterAction(formData: FormData) {
   const session = await requireSession();
+  const referenceNumber = await getNextIncomingLetterReferenceNumber();
   const fileEntry = formData.get("letter_file");
   const parsed = incomingLetterSchema.safeParse({
     sender_name: formData.get("sender_name"),
@@ -958,6 +966,7 @@ export async function createIncomingLetterAction(formData: FormData) {
 
     await execute(
       `INSERT INTO incoming_letters (
+        reference_number,
         sender_name,
         sender_organization,
         subject,
@@ -967,8 +976,9 @@ export async function createIncomingLetterAction(formData: FormData) {
         original_file_name,
         description,
         user_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        referenceNumber,
         parsed.data.sender_name,
         parsed.data.sender_organization || null,
         parsed.data.subject,
