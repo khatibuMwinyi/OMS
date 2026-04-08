@@ -6,12 +6,15 @@ import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
 
 import {
   getInvoiceDocument,
+  getInvoiceDocumentPublic,
   getLetterDocument,
   getIncomingLetterDocument,
   getPettyCashDocument,
   getReceiptDocument,
+  getReceiptDocumentPublic,
   getVoucherDocument,
 } from "@/lib/records";
+import { verifyPublicShareToken } from "@/lib/public-share";
 import { buildInvoicePdf } from "@/lib/invoice-pdf";
 import { buildReceiptPdf } from "@/lib/receipt-pdf";
 import { buildFormalLetterPdf } from "@/lib/letter-pdf";
@@ -155,7 +158,7 @@ function drawSectionHeading(
   width: number,
   font: PDFFont,
 ) {
-  const accent = rgb(0.72, 0.5, 0.22);
+  const accent = rgb(0.86, 0.42, 0.1);
 
   page.drawText(title, {
     x,
@@ -283,13 +286,10 @@ function drawStackedField(
 }
 
 export async function GET(_request: Request, { params }: RouteParams) {
-  const session = await getCurrentSession();
-  if (!session) {
-    return NextResponse.redirect(new URL("/", _request.url));
-  }
-
   const requestUrl = new URL(_request.url);
   const isPreview = requestUrl.searchParams.get("preview") === "1";
+  const shareToken = requestUrl.searchParams.get("token");
+  const verifiedShareToken = verifyPublicShareToken(shareToken);
 
   const { type, id } = await params;
   const numericId = Number(id);
@@ -297,24 +297,41 @@ export async function GET(_request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "Invalid document id" }, { status: 400 });
   }
 
+  const isPublicShareAccess =
+    !!verifiedShareToken &&
+    verifiedShareToken.type === type &&
+    verifiedShareToken.id === numericId;
+
+  const session = isPublicShareAccess ? null : await getCurrentSession();
+  if (!session && !isPublicShareAccess) {
+    return NextResponse.redirect(new URL("/", _request.url));
+  }
+
   let pdfBytes: Uint8Array;
   let attachmentName = `${type}_${numericId}.pdf`;
 
   if (type === "invoice") {
-    const document = await getInvoiceDocument(session, numericId);
+    const document = isPublicShareAccess
+      ? await getInvoiceDocumentPublic(numericId)
+      : await getInvoiceDocument(session!, numericId);
     if (!document) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
     }
 
     pdfBytes = await buildInvoicePdf(document);
   } else if (type === "receipt") {
-    const document = await getReceiptDocument(session, numericId);
+    const document = isPublicShareAccess
+      ? await getReceiptDocumentPublic(numericId)
+      : await getReceiptDocument(session!, numericId);
     if (!document) {
       return NextResponse.json({ error: "Receipt not found" }, { status: 404 });
     }
 
     pdfBytes = await buildReceiptPdf(document);
   } else if (type === "voucher" || type === "payment-voucher") {
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const document = await getVoucherDocument(session, numericId);
     if (!document) {
       return NextResponse.json({ error: "Voucher not found" }, { status: 404 });
@@ -322,6 +339,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     pdfBytes = await buildVoucherPdf(document);
   } else if (type === "letter") {
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const document = await getLetterDocument(session, numericId);
     if (!document) {
       return NextResponse.json({ error: "Letter not found" }, { status: 404 });
@@ -329,6 +349,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     pdfBytes = await buildFormalLetterPdf(document);
   } else if (type === "incoming-letter") {
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const document = await getIncomingLetterDocument(session, numericId);
     if (!document) {
       return NextResponse.json(
@@ -357,11 +380,15 @@ export async function GET(_request: Request, { params }: RouteParams) {
         { status: 404 },
       );
     }
+
     attachmentName = toAttachmentName(
       document.originalFileName,
-      `incoming-letter-${numericId}.pdf`,
+      `incoming-letter-${document.referenceNumber ?? numericId}.pdf`,
     );
   } else if (type === "petty-cash" || type === "petty-cash-voucher") {
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const document = await getPettyCashDocument(session, numericId);
     if (!document) {
       return NextResponse.json(
