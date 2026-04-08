@@ -189,7 +189,7 @@ export function LegacySelectionFields({
       </label>
 
       {showAmount ? (
-        <label className="space-y-2 md:col-span-2">
+        <label className="space-y-2 lg:col-span-2">
           <span className="field-label">Amount</span>
           <Input name="amount" type="number" step="0.01" required />
         </label>

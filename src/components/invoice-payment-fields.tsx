@@ -66,13 +66,9 @@ export function InvoicePaymentFields({
       </RecordFieldRow>
 
       {paymentMethod === "Bank Transfer" ? (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           <RecordFieldRow label="Bank name">
-            <Select
-              name="bank_name"
-              defaultValue={FIXED_BANK_NAME}
-              required
-            >
+            <Select name="bank_name" defaultValue={FIXED_BANK_NAME} required>
               {tanzanianBankOptions.map((bank) => (
                 <option key={bank} value={bank}>
                   {bank}
@@ -100,8 +96,8 @@ export function InvoicePaymentFields({
       ) : null}
 
       {paymentMethod === "Mobile Money" ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <RecordFieldRow label="Mobile number">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <RecordFieldRow label="Lipa Number">
             <Input
               name="mobile_number"
               defaultValue={FIXED_MOBILE_NUMBER}

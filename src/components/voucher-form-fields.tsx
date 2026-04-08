@@ -1,11 +1,14 @@
-'use client';
+"use client";
 
 import { useState } from "react";
 
 import { LegacySelectionFields } from "@/components/legacy-selection-fields";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { legacyVoucherRecords, type LegacySelectionRecord } from "@/lib/legacy-form-data";
+import {
+  legacyVoucherRecords,
+  type LegacySelectionRecord,
+} from "@/lib/legacy-form-data";
 import {
   FIXED_BANK_ACCOUNT_NAME,
   FIXED_BANK_ACCOUNT_NUMBER,
@@ -19,7 +22,10 @@ type VoucherFormFieldsProps = {
   templates?: LegacySelectionRecord[];
 };
 
-export function VoucherFormFields({ templates, voucherNumber }: VoucherFormFieldsProps) {
+export function VoucherFormFields({
+  templates,
+  voucherNumber,
+}: VoucherFormFieldsProps) {
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const mergedRecords = [...legacyVoucherRecords, ...(templates ?? [])].filter(
     (record, index, allRecords) =>
@@ -37,7 +43,12 @@ export function VoucherFormFields({ templates, voucherNumber }: VoucherFormField
     <>
       <label className="space-y-2">
         <span className="field-label">Voucher number</span>
-        <Input name="voucher_number" defaultValue={voucherNumber} readOnly required />
+        <Input
+          name="voucher_number"
+          defaultValue={voucherNumber}
+          readOnly
+          required
+        />
       </label>
       <label className="space-y-2">
         <span className="field-label">Date</span>
@@ -48,15 +59,14 @@ export function VoucherFormFields({ templates, voucherNumber }: VoucherFormField
         <Input name="customer_name" required />
       </label>
 
-      <fieldset className="space-y-3 md:col-span-2">
+      <fieldset className="space-y-3 lg:col-span-2">
         <span className="field-label">Payment method</span>
         <div className="flex flex-wrap gap-4">
-          {[
-            "Cash",
-            "Bank Transfer",
-            "Mobile Transaction",
-          ].map((method) => (
-            <label className="flex items-center gap-2 text-sm text-slate-700" key={method}>
+          {["Cash", "Bank Transfer", "Mobile Transaction"].map((method) => (
+            <label
+              className="flex items-center gap-2 text-sm text-slate-700"
+              key={method}
+            >
               <input
                 checked={paymentMethod === method}
                 className="h-4 w-4 border-slate-300 text-primary focus:ring-primary"
@@ -72,10 +82,15 @@ export function VoucherFormFields({ templates, voucherNumber }: VoucherFormField
       </fieldset>
 
       {paymentMethod === "Bank Transfer" ? (
-        <div className="md:col-span-2 grid gap-3 rounded-3xl border border-border bg-slate-50 p-4 sm:grid-cols-2">
+        <div className="lg:col-span-2 grid gap-3 rounded-3xl border border-border bg-slate-50 p-4 sm:grid-cols-2">
           <label className="space-y-2">
             <span className="field-label">Bank name</span>
-            <Input name="bank_name" defaultValue={FIXED_BANK_NAME} readOnly required />
+            <Input
+              name="bank_name"
+              defaultValue={FIXED_BANK_NAME}
+              readOnly
+              required
+            />
           </label>
           <label className="space-y-2">
             <span className="field-label">Account number</span>
@@ -103,7 +118,7 @@ export function VoucherFormFields({ templates, voucherNumber }: VoucherFormField
       ) : null}
 
       {paymentMethod === "Mobile Transaction" ? (
-        <div className="md:col-span-2 grid gap-3 rounded-3xl border border-border bg-slate-50 p-4 sm:grid-cols-2">
+        <div className="lg:col-span-2 grid gap-3 rounded-3xl border border-border bg-slate-50 p-4 sm:grid-cols-2">
           <label className="space-y-2">
             <span className="field-label">Mobile number</span>
             <Input
@@ -122,7 +137,7 @@ export function VoucherFormFields({ templates, voucherNumber }: VoucherFormField
               required
             />
           </label>
-          <label className="space-y-2 md:col-span-2">
+          <label className="space-y-2 lg:col-span-2">
             <span className="field-label">Reference number</span>
             <Input name="mobile_reference" required />
           </label>

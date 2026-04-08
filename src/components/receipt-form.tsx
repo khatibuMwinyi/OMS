@@ -62,7 +62,7 @@ export function ReceiptForm({
       ? submissionState.error
         ? `error:${submissionState.token}`
         : `status:${submissionState.token}`
-        : "";
+      : "";
 
     if (!resultKey || lastHandledResult.current === resultKey) {
       return;
@@ -79,7 +79,12 @@ export function ReceiptForm({
       toast.success(submissionState.status);
       router.refresh();
     }
-  }, [router, submissionState.error, submissionState.status, submissionState.token]);
+  }, [
+    router,
+    submissionState.error,
+    submissionState.status,
+    submissionState.token,
+  ]);
 
   const formKey = isEditing
     ? `receipt-edit-${document?.id ?? "new"}`
@@ -103,7 +108,7 @@ export function ReceiptForm({
             <Input
               name="receipt_number"
               defaultValue={
-                isEditing ? document?.receiptNumber ?? "" : nextReceiptNumber
+                isEditing ? (document?.receiptNumber ?? "") : nextReceiptNumber
               }
               readOnly={!isEditing}
               required
@@ -142,7 +147,7 @@ export function ReceiptForm({
             </h3>
           </div>
 
-          <div className="grid gap-4 p-5 md:grid-cols-2">
+          <div className="grid gap-4 p-5 lg:grid-cols-2">
             <LegacySelectionFields
               records={legacyReceiptRecords}
               defaultType={document?.type ?? "Revenue"}
@@ -151,7 +156,7 @@ export function ReceiptForm({
               defaultDescription={document?.description ?? undefined}
               showAmount={false}
             />
-            <label className="space-y-2 md:col-span-2">
+            <label className="space-y-2 lg:col-span-2">
               <span className="field-label">Customer phone</span>
               <Input name="phone" defaultValue={document?.phone ?? ""} />
             </label>
