@@ -1,0 +1,1 @@
+export const SESSION_IDLE_TIMEOUT_MS = 1000 * 60 * 10;
