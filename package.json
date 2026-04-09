@@ -21,6 +21,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@fontsource/inter": "^5.2.8",
     "@radix-ui/react-slot": "^1.2.4",
     "@types/node": "^24.7.0",
     "@types/react": "^19.2.2",

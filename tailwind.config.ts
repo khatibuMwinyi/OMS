@@ -61,12 +61,12 @@ const config: Config = {
         "3xl": "1.75rem",
       },
       boxShadow: {
-        soft: "0 18px 50px rgba(15, 23, 42, 0.08)",
-        lift: "0 28px 60px rgba(15, 23, 42, 0.12)",
+        soft: "0 24px 62px rgba(1, 7, 20, 0.42)",
+        lift: "0 34px 86px rgba(1, 7, 20, 0.55)",
       },
       backgroundImage: {
         "hero-grid":
-          "linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px)",
+          "linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)",
       },
     },
   },
