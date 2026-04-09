@@ -11,6 +11,8 @@ type Scope = {
   params: Array<string | number>;
 };
 
+type SendChannel = "whatsapp" | "email";
+
 export type InvoiceRecord = {
   id: number;
   invoiceNumber: string;
@@ -29,6 +31,9 @@ export type InvoiceRecord = {
   vat: number;
   discount: number;
   grandTotal: number;
+  sentAt: string | null;
+  sentBy: number | null;
+  sentVia: SendChannel | null;
   userId: number;
   createdAt: string;
 };
@@ -56,6 +61,9 @@ export type ReceiptRecord = {
   branchName: string | null;
   referenceNumber: string | null;
   receiptDate: string;
+  sentAt: string | null;
+  sentBy: number | null;
+  sentVia: SendChannel | null;
   userId: number;
   createdAt: string;
 };
@@ -112,6 +120,13 @@ export type LetterRecord = {
   receiverAddress: string | null;
   heading: string | null;
   body: string | null;
+  status: "pending" | "approved";
+  approvedBy: number | null;
+  approvedAt: string | null;
+  approvedSignaturePath: string | null;
+  sentAt: string | null;
+  sentBy: number | null;
+  sentVia: SendChannel | null;
   userId: number;
   createdAt: string;
   updatedAt: string;
@@ -132,14 +147,61 @@ export type IncomingLetterRecord = {
   createdAt: string;
 };
 
-function scope(session: SessionUser): Scope {
-  return session.role === "admin"
-    ? { clause: " WHERE 1 = 1", params: [] }
-    : { clause: " WHERE 1 = 1 AND user_id = ?", params: [session.userId] };
+function scope(_session: SessionUser): Scope {
+  return { clause: " WHERE 1 = 1", params: [] };
 }
 
 let printedLettersTableReady: Promise<void> | null = null;
 let incomingLettersTableReady: Promise<void> | null = null;
+let documentWorkflowColumnsReady: Promise<void> | null = null;
+
+export function ensureDocumentWorkflowColumns() {
+  if (!documentWorkflowColumnsReady) {
+    documentWorkflowColumnsReady = execute(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS signature_image_path VARCHAR(500) NULL
+    `)
+      .then(() =>
+        execute(`
+          ALTER TABLE invoices
+          ADD COLUMN IF NOT EXISTS sent_at TIMESTAMP NULL
+        `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE invoices
+          ADD COLUMN IF NOT EXISTS sent_by INT NULL
+        `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE invoices
+          ADD COLUMN IF NOT EXISTS sent_via ENUM('whatsapp', 'email') NULL
+        `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE receipts
+          ADD COLUMN IF NOT EXISTS sent_at TIMESTAMP NULL
+        `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE receipts
+          ADD COLUMN IF NOT EXISTS sent_by INT NULL
+        `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE receipts
+          ADD COLUMN IF NOT EXISTS sent_via ENUM('whatsapp', 'email') NULL
+        `),
+      )
+      .then(() => undefined);
+  }
+
+  return documentWorkflowColumnsReady;
+}
 
 function ensurePrintedLettersTable() {
   if (!printedLettersTableReady) {
@@ -150,9 +212,19 @@ function ensurePrintedLettersTable() {
         reference_number VARCHAR(50),
         description TEXT,
         pdf_path VARCHAR(500) NOT NULL,
+        status ENUM('pending', 'approved') NOT NULL DEFAULT 'pending',
+        approved_by INT,
+        approved_at TIMESTAMP NULL,
+        approved_signature_path VARCHAR(500),
+        sent_at TIMESTAMP NULL,
+        sent_by INT,
+        sent_via ENUM('whatsapp', 'email') NULL,
         user_id INT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         KEY idx_printed_letters_user_created (user_id, created_at),
+        KEY idx_printed_letters_status_created (status, created_at),
+        FOREIGN KEY (approved_by) REFERENCES users(id),
+        FOREIGN KEY (sent_by) REFERENCES users(id),
         FOREIGN KEY (user_id) REFERENCES users(id)
       )
     `)
@@ -162,10 +234,56 @@ function ensurePrintedLettersTable() {
           ADD COLUMN IF NOT EXISTS reference_number VARCHAR(50) NULL
         `),
       )
+      .then(() =>
+        execute(`
+          ALTER TABLE printed_letters
+          ADD COLUMN IF NOT EXISTS status ENUM('pending', 'approved') NOT NULL DEFAULT 'pending'
+        `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE printed_letters
+          ADD COLUMN IF NOT EXISTS approved_by INT NULL
+        `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE printed_letters
+          ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP NULL
+        `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE printed_letters
+          ADD COLUMN IF NOT EXISTS approved_signature_path VARCHAR(500) NULL
+        `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE printed_letters
+          ADD COLUMN IF NOT EXISTS sent_at TIMESTAMP NULL
+        `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE printed_letters
+          ADD COLUMN IF NOT EXISTS sent_by INT NULL
+        `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE printed_letters
+          ADD COLUMN IF NOT EXISTS sent_via ENUM('whatsapp', 'email') NULL
+        `),
+      )
       .then(() => undefined);
   }
 
   return printedLettersTableReady;
+}
+
+export function ensureLetterWorkflowColumns() {
+  return ensurePrintedLettersTable();
 }
 
 function ensureIncomingLettersTable() {
@@ -287,6 +405,18 @@ function incrementPrefixedSequentialNumber(
   return `${prefix}${String(1).padStart(minimumDigits, "0")}`;
 }
 
+function getCurrentDateStamp() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}${month}${day}`;
+}
+
+function formatOweruLetterReference(dateStamp: string, sequence: number) {
+  return `OWERU-${dateStamp}-${String(sequence).padStart(4, "0")}`;
+}
+
 async function getLatestReceiptNumber() {
   const record = await firstOrNull<{ receiptNumber: string }>(
     `SELECT receipt_number AS receiptNumber
@@ -341,23 +471,16 @@ async function getLatestPettyCashNumber() {
   return record?.pettyCashNumber ?? null;
 }
 
-async function getLatestLetterReferenceNumber() {
+async function getLatestLetterReferenceNumber(dateStamp: string) {
   await ensurePrintedLettersTable();
 
   const record = await firstOrNull<{ referenceNumber: string }>(
-    `SELECT COALESCE(
-       NULLIF(reference_number, ''),
-       CONCAT('LR', LPAD(id, 3, '0'))
-     ) AS referenceNumber
+    `SELECT reference_number AS referenceNumber
      FROM printed_letters
-     ORDER BY CAST(
-       SUBSTRING(
-         COALESCE(NULLIF(reference_number, ''), CONCAT('LR', LPAD(id, 3, '0'))),
-         3
-       ) AS UNSIGNED
-     ) DESC, created_at DESC
+     WHERE reference_number LIKE ?
+     ORDER BY CAST(SUBSTRING_INDEX(reference_number, '-', -1) AS UNSIGNED) DESC, created_at DESC
      LIMIT 1`,
-    [],
+    [`OWERU-${dateStamp}-%`],
   );
 
   return record?.referenceNumber ?? null;
@@ -408,10 +531,15 @@ export async function getNextPettyCashNumber() {
 }
 
 export async function getNextLetterReferenceNumber() {
-  return incrementPrefixedSequentialNumber(
-    await getLatestLetterReferenceNumber(),
-    "LR",
-  );
+  const dateStamp = getCurrentDateStamp();
+  const latestReference = await getLatestLetterReferenceNumber(dateStamp);
+  const latestMatch = latestReference?.match(/^OWERU-\d{8}-(\d+)$/);
+  const latestSequence = latestMatch ? Number(latestMatch[1]) : 0;
+  const nextSequence = Number.isFinite(latestSequence)
+    ? latestSequence + 1
+    : 1;
+
+  return formatOweruLetterReference(dateStamp, nextSequence);
 }
 
 export async function getNextIncomingLetterReferenceNumber() {
@@ -427,6 +555,7 @@ export async function listInvoices(
   period: ReportPeriod = "all",
   context?: ReportPeriodContext,
 ) {
+  await ensureDocumentWorkflowColumns();
   const filter = scope(session);
   const periodFilter = buildReportPeriodScope("invoice_date", period, context);
   return queryRows<InvoiceRecord>(
@@ -447,6 +576,9 @@ export async function listInvoices(
       vat,
       discount,
       grand_total AS grandTotal,
+      sent_at AS sentAt,
+      sent_by AS sentBy,
+      sent_via AS sentVia,
       user_id AS userId,
       created_at AS createdAt
      FROM invoices${filter.clause}${periodFilter.clause}
@@ -462,6 +594,7 @@ export async function listReceipts(
   period: ReportPeriod = "all",
   context?: ReportPeriodContext,
 ) {
+  await ensureDocumentWorkflowColumns();
   const filter = scope(session);
   const periodFilter = buildReportPeriodScope("receipt_date", period, context);
   return queryRows<ReceiptRecord>(
@@ -479,6 +612,9 @@ export async function listReceipts(
       branch_name AS branchName,
       reference_number AS referenceNumber,
       receipt_date AS receiptDate,
+      sent_at AS sentAt,
+      sent_by AS sentBy,
+      sent_via AS sentVia,
       user_id AS userId,
       created_at AS createdAt
      FROM receipts${filter.clause}${periodFilter.clause}
@@ -563,15 +699,13 @@ export async function listLetters(
   context?: ReportPeriodContext,
 ) {
   await ensurePrintedLettersTable();
-  const filterClause = session.role === "admin" ? "" : " AND pl.user_id = ?";
-  const filterParams = session.role === "admin" ? [] : [session.userId];
   const periodFilter = buildReportPeriodScope("pl.created_at", period, context);
   return queryRows<LetterRecord>(
     `SELECT pl.id,
       pl.name,
       COALESCE(
         NULLIF(pl.reference_number, ''),
-        CONCAT('LR', LPAD(pl.id, 3, '0'))
+        CONCAT('OWERU-', DATE_FORMAT(pl.created_at, '%Y%m%d'), '-', LPAD(pl.id, 4, '0'))
       ) AS referenceNumber,
       pl.description,
       pl.pdf_path AS pdfPath,
@@ -579,15 +713,22 @@ export async function listLetters(
       lc.receiver_address AS receiverAddress,
       lc.heading,
       lc.body,
+      pl.status,
+      pl.approved_by AS approvedBy,
+      pl.approved_at AS approvedAt,
+      pl.approved_signature_path AS approvedSignaturePath,
+      pl.sent_at AS sentAt,
+      pl.sent_by AS sentBy,
+      pl.sent_via AS sentVia,
       pl.user_id AS userId,
       pl.created_at AS createdAt,
       COALESCE(lc.updated_at, pl.created_at) AS updatedAt
      FROM printed_letters pl
       LEFT JOIN letter_content lc ON lc.letter_id = pl.id
-     WHERE 1 = 1${filterClause}${periodFilter.clause}
+       WHERE 1 = 1${periodFilter.clause}
      ORDER BY pl.created_at DESC
      LIMIT ?`,
-    [...filterParams, ...periodFilter.params, limit],
+      [...periodFilter.params, limit],
   ).catch(() => []);
 }
 
@@ -595,7 +736,7 @@ export async function getInvoiceDocument(
   session: SessionUser,
   invoiceId: number,
 ) {
-  const accessClause = session.role === "admin" ? "" : " AND user_id = ?";
+  await ensureDocumentWorkflowColumns();
   const invoice = await firstOrNull<InvoiceRecord>(
     `SELECT id,
       invoice_number AS invoiceNumber,
@@ -614,12 +755,15 @@ export async function getInvoiceDocument(
       vat,
       discount,
       grand_total AS grandTotal,
+      sent_at AS sentAt,
+      sent_by AS sentBy,
+      sent_via AS sentVia,
       user_id AS userId,
       created_at AS createdAt
      FROM invoices
-     WHERE id = ?${accessClause}
+     WHERE id = ?
      LIMIT 1`,
-    session.role === "admin" ? [invoiceId] : [invoiceId, session.userId],
+    [invoiceId],
   );
 
   if (!invoice) {
@@ -638,6 +782,7 @@ export async function getInvoiceDocument(
 }
 
 export async function getInvoiceDocumentPublic(invoiceId: number) {
+  await ensureDocumentWorkflowColumns();
   const invoice = await firstOrNull<InvoiceRecord>(
     `SELECT id,
       invoice_number AS invoiceNumber,
@@ -656,6 +801,9 @@ export async function getInvoiceDocumentPublic(invoiceId: number) {
       vat,
       discount,
       grand_total AS grandTotal,
+      sent_at AS sentAt,
+      sent_by AS sentBy,
+      sent_via AS sentVia,
       user_id AS userId,
       created_at AS createdAt
      FROM invoices
@@ -683,7 +831,7 @@ export async function getReceiptDocument(
   session: SessionUser,
   receiptId: number,
 ) {
-  const accessClause = session.role === "admin" ? "" : " AND user_id = ?";
+  await ensureDocumentWorkflowColumns();
   return firstOrNull<ReceiptRecord>(
     `SELECT id,
       receipt_number AS receiptNumber,
@@ -699,16 +847,20 @@ export async function getReceiptDocument(
       branch_name AS branchName,
       reference_number AS referenceNumber,
       receipt_date AS receiptDate,
+      sent_at AS sentAt,
+      sent_by AS sentBy,
+      sent_via AS sentVia,
       user_id AS userId,
       created_at AS createdAt
      FROM receipts
-     WHERE id = ?${accessClause}
+     WHERE id = ?
      LIMIT 1`,
-    session.role === "admin" ? [receiptId] : [receiptId, session.userId],
+    [receiptId],
   );
 }
 
 export async function getReceiptDocumentPublic(receiptId: number) {
+  await ensureDocumentWorkflowColumns();
   return firstOrNull<ReceiptRecord>(
     `SELECT id,
       receipt_number AS receiptNumber,
@@ -724,6 +876,9 @@ export async function getReceiptDocumentPublic(receiptId: number) {
       branch_name AS branchName,
       reference_number AS referenceNumber,
       receipt_date AS receiptDate,
+      sent_at AS sentAt,
+      sent_by AS sentBy,
+      sent_via AS sentVia,
       user_id AS userId,
       created_at AS createdAt
      FROM receipts
@@ -737,7 +892,6 @@ export async function getPettyCashDocument(
   session: SessionUser,
   pettyCashId: number,
 ) {
-  const accessClause = session.role === "admin" ? "" : " AND user_id = ?";
   return firstOrNull<PettyCashRecord>(
     `SELECT id,
       date,
@@ -751,9 +905,9 @@ export async function getPettyCashDocument(
       user_id AS userId,
       created_at AS createdAt
      FROM petty_cash_transactions
-     WHERE id = ?${accessClause}
+     WHERE id = ?
      LIMIT 1`,
-    session.role === "admin" ? [pettyCashId] : [pettyCashId, session.userId],
+    [pettyCashId],
   );
 }
 
@@ -761,7 +915,6 @@ export async function getVoucherDocument(
   session: SessionUser,
   voucherId: number,
 ) {
-  const accessClause = session.role === "admin" ? "" : " AND user_id = ?";
   return firstOrNull<VoucherRecord>(
     `SELECT id,
       voucher_number AS voucherNumber,
@@ -789,9 +942,9 @@ export async function getVoucherDocument(
       user_id AS userId,
       created_at AS createdAt
      FROM payment_vouchers
-     WHERE id = ?${accessClause}
+     WHERE id = ?
      LIMIT 1`,
-    session.role === "admin" ? [voucherId] : [voucherId, session.userId],
+    [voucherId],
   );
 }
 
@@ -800,13 +953,12 @@ export async function getLetterDocument(
   letterId: number,
 ) {
   await ensurePrintedLettersTable();
-  const accessClause = session.role === "admin" ? "" : " AND pl.user_id = ?";
   const letter = await firstOrNull<LetterRecord>(
     `SELECT pl.id,
       pl.name,
       COALESCE(
         NULLIF(pl.reference_number, ''),
-        CONCAT('LR', LPAD(pl.id, 3, '0'))
+        CONCAT('OWERU-', DATE_FORMAT(pl.created_at, '%Y%m%d'), '-', LPAD(pl.id, 4, '0'))
       ) AS referenceNumber,
       pl.description,
       pl.pdf_path AS pdfPath,
@@ -814,17 +966,57 @@ export async function getLetterDocument(
       lc.receiver_address AS receiverAddress,
       lc.heading,
       lc.body,
+      pl.status,
+      pl.approved_by AS approvedBy,
+      pl.approved_at AS approvedAt,
+      pl.approved_signature_path AS approvedSignaturePath,
+      pl.sent_at AS sentAt,
+      pl.sent_by AS sentBy,
+      pl.sent_via AS sentVia,
       pl.user_id AS userId,
       pl.created_at AS createdAt,
       pl.created_at AS updatedAt
      FROM printed_letters pl
      LEFT JOIN letter_content lc ON lc.letter_id = pl.id
-     WHERE pl.id = ?${accessClause}
+     WHERE pl.id = ?
      LIMIT 1`,
-    session.role === "admin" ? [letterId] : [letterId, session.userId],
+    [letterId],
   );
 
   return letter;
+}
+
+export async function getLetterDocumentPublic(letterId: number) {
+  await ensurePrintedLettersTable();
+  return firstOrNull<LetterRecord>(
+    `SELECT pl.id,
+      pl.name,
+      COALESCE(
+        NULLIF(pl.reference_number, ''),
+        CONCAT('OWERU-', DATE_FORMAT(pl.created_at, '%Y%m%d'), '-', LPAD(pl.id, 4, '0'))
+      ) AS referenceNumber,
+      pl.description,
+      pl.pdf_path AS pdfPath,
+      lc.letter_date AS letterDate,
+      lc.receiver_address AS receiverAddress,
+      lc.heading,
+      lc.body,
+      pl.status,
+      pl.approved_by AS approvedBy,
+      pl.approved_at AS approvedAt,
+      pl.approved_signature_path AS approvedSignaturePath,
+      pl.sent_at AS sentAt,
+      pl.sent_by AS sentBy,
+      pl.sent_via AS sentVia,
+      pl.user_id AS userId,
+      pl.created_at AS createdAt,
+      pl.created_at AS updatedAt
+     FROM printed_letters pl
+     LEFT JOIN letter_content lc ON lc.letter_id = pl.id
+     WHERE pl.id = ?
+     LIMIT 1`,
+    [letterId],
+  );
 }
 
 export async function listIncomingLetters(

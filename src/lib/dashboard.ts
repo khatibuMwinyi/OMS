@@ -1,6 +1,10 @@
 import type { RowDataPacket } from "mysql2/promise";
 
 import { queryRows } from "./db";
+import {
+  ensureDocumentWorkflowColumns,
+  ensureLetterWorkflowColumns,
+} from "./records";
 import type { SessionUser, UserRole } from "./session";
 
 type CountRow = RowDataPacket & {
@@ -29,17 +33,21 @@ export type RecentInvoice = RowDataPacket & {
   id: number;
   invoiceNumber: string;
   customerName: string;
+  phone: string | null;
   invoiceDate: string;
   grandTotal: number;
+  sentAt: string | null;
 };
 
 export type RecentReceipt = RowDataPacket & {
   id: number;
   receiptNumber: string;
   customerName: string;
+  phone: string | null;
   receiptDate: string;
   amount: number;
   paymentMethod: string;
+  sentAt: string | null;
 };
 
 export type RecentPettyCash = RowDataPacket & {
@@ -67,13 +75,12 @@ export type RecentLetter = RowDataPacket & {
   id: number;
   name: string;
   description: string;
+  status: "pending" | "approved";
   createdAt: string;
 };
 
 function scopeFilter(session: SessionUser) {
-  return session.role === "admin"
-    ? { clause: "", params: [] as Array<string | number> }
-    : { clause: " WHERE user_id = ?", params: [session.userId] };
+  return { clause: "", params: [] as Array<string | number> };
 }
 
 async function safeCount(sql: string, params: Array<string | number>) {
@@ -97,15 +104,13 @@ async function safeMoney(sql: string, params: Array<string | number>) {
 export async function getDashboardOverview(
   session: SessionUser,
 ): Promise<DashboardOverview> {
+  await ensureDocumentWorkflowColumns();
+  await ensureLetterWorkflowColumns();
   const filter = scopeFilter(session);
   const filterClause = filter.clause;
   const filterParams = filter.params;
-  const approvedVoucherClause =
-    session.role === "admin"
-      ? " WHERE status = 'approved'"
-      : " WHERE status = 'approved' AND user_id = ?";
-  const approvedVoucherParams =
-    session.role === "admin" ? [] : [session.userId];
+  const approvedVoucherClause = " WHERE status = 'approved'";
+  const approvedVoucherParams: Array<string | number> = [];
   const pettyCashClause = filterClause;
   const pettyCashParams = filterParams;
 
@@ -166,11 +171,11 @@ export async function getDashboardOverview(
       ? safeCount("SELECT COUNT(*) AS count FROM users", [])
       : Promise.resolve(0),
     queryRows<RecentInvoice>(
-      `SELECT id, invoice_number AS invoiceNumber, director AS customerName, invoice_date AS invoiceDate, grand_total AS grandTotal FROM invoices${filterClause} ORDER BY created_at DESC LIMIT 5`,
+      `SELECT id, invoice_number AS invoiceNumber, director AS customerName, phone, invoice_date AS invoiceDate, grand_total AS grandTotal, sent_at AS sentAt FROM invoices${filterClause} ORDER BY created_at DESC LIMIT 5`,
       filterParams,
     ).catch(() => []),
     queryRows<RecentReceipt>(
-      `SELECT id, receipt_number AS receiptNumber, customer_name AS customerName, receipt_date AS receiptDate, amount, payment_method AS paymentMethod FROM receipts${filterClause} ORDER BY created_at DESC LIMIT 5`,
+      `SELECT id, receipt_number AS receiptNumber, customer_name AS customerName, phone, receipt_date AS receiptDate, amount, payment_method AS paymentMethod, sent_at AS sentAt FROM receipts${filterClause} ORDER BY created_at DESC LIMIT 5`,
       filterParams,
     ).catch(() => []),
     queryRows<RecentPettyCash>(
@@ -182,12 +187,12 @@ export async function getDashboardOverview(
       filterParams,
     ).catch(() => []),
     queryRows<RecentLetter>(
-      `SELECT id, name, COALESCE(description, '') AS description, created_at AS createdAt FROM printed_letters${filterClause} ORDER BY created_at DESC LIMIT 5`,
+      `SELECT id, name, COALESCE(description, '') AS description, status, created_at AS createdAt FROM printed_letters${filterClause} ORDER BY created_at DESC LIMIT 5`,
       filterParams,
     ).catch(() => []),
   ]);
 
-  const scopeLabel = session.role === "admin" ? "All records" : "Your records";
+  const scopeLabel = "All records";
 
   return {
     scopeLabel,
