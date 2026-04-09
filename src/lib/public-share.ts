@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
-export type PublicShareType = "invoice" | "receipt";
+export type PublicShareType = "invoice" | "receipt" | "letter";
 
 export type PublicShareTokenPayload = {
   type: PublicShareType;
@@ -75,7 +75,11 @@ export function verifyPublicShareToken(
       base64UrlDecode(payloadPart),
     ) as PublicShareTokenPayload;
 
-    if (payload.type !== "invoice" && payload.type !== "receipt") {
+    if (
+      payload.type !== "invoice" &&
+      payload.type !== "receipt" &&
+      payload.type !== "letter"
+    ) {
       return null;
     }
 
