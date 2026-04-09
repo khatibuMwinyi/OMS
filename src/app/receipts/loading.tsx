@@ -16,7 +16,7 @@ export default function ReceiptLoading() {
             <div className="h-2 w-2 rounded-full bg-[#1A1F2E] animate-pulse"></div>
           </div>
         </div>
-        <p className="text-sm font-medium text-slate-400 tracking-wide uppercase">
+        <p className="text-sm font-medium text-muted-foreground tracking-wide uppercase">
           Loading receipts...
         </p>
       </div>

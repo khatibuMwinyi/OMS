@@ -16,7 +16,7 @@ export default function PettyCashLoading() {
             <div className="h-2 w-2 rounded-full bg-[#1A1F2E] animate-pulse"></div>
           </div>
         </div>
-        <p className="text-sm font-medium text-slate-400 tracking-wide uppercase">
+        <p className="text-sm font-medium text-muted-foreground tracking-wide uppercase">
           Processing petty cash vouchers...
         </p>
       </div>

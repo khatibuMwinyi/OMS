@@ -20,10 +20,10 @@ export default async function PageLoading() {
         </div>
 
         <div className="space-y-2">
-           <h2 className="text-xl font-semibold text-slate-900 tracking-tight">
+           <h2 className="text-xl font-semibold text-foreground tracking-tight">
             Preparing your workspace
           </h2>
-          <p className="text-sm text-slate-500 max-w-[280px] mx-auto leading-relaxed">
+          <p className="text-sm text-muted-foreground max-w-[280px] mx-auto leading-relaxed">
             Please wait while we sync your records and update your dashboard.
           </p>
         </div>

@@ -4,25 +4,25 @@
 
 @layer base {
   :root {
-    --background: 209 85% 71%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 222 47% 11%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 220 33% 26%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 38 28% 94%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 37 68% 47%;
-    --accent-foreground: 222 47% 11%;
+    --background: 221 50% 8%;
+    --foreground: 214 39% 95%;
+    --card: 221 34% 16%;
+    --card-foreground: 214 39% 95%;
+    --popover: 221 39% 14%;
+    --popover-foreground: 214 39% 95%;
+    --primary: 40 92% 74%;
+    --primary-foreground: 221 52% 10%;
+    --secondary: 219 30% 25%;
+    --secondary-foreground: 214 39% 95%;
+    --muted: 220 30% 17%;
+    --muted-foreground: 218 19% 68%;
+    --accent: 161 55% 62%;
+    --accent-foreground: 221 52% 10%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-    --border: 215 22% 87%;
-    --input: 215 22% 87%;
-    --ring: 37 68% 47%;
+    --border: 220 22% 30%;
+    --input: 220 22% 26%;
+    --ring: 40 92% 74%;
     --font-display: "Futura PT", "Poppins", sans-serif;
   }
 
@@ -31,16 +31,41 @@
   }
 
   html {
-    color-scheme: light;
+    color-scheme: dark;
   }
 
   body {
     @apply min-h-screen bg-background font-body text-foreground antialiased;
-    background-color: #76b3f4;
+    background:
+      radial-gradient(
+        circle at 9% 0%,
+        rgba(251, 191, 36, 0.2),
+        transparent 33%
+      ),
+      radial-gradient(
+        circle at 86% 16%,
+        rgba(52, 211, 153, 0.18),
+        transparent 31%
+      ),
+      radial-gradient(
+        circle at 78% 86%,
+        rgba(96, 165, 250, 0.14),
+        transparent 34%
+      ),
+      linear-gradient(180deg, #0a1324 0%, #050b17 100%);
   }
 
   body::before {
-    content: none;
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.72), transparent 75%);
+    opacity: 0.26;
   }
 
   a {
@@ -82,7 +107,12 @@
   .recent-card,
   .module-card,
   .stat-card {
-    @apply rounded-3xl border border-border/80 bg-card/95 shadow-soft backdrop-blur;
+    @apply rounded-3xl border border-border/80 shadow-soft backdrop-blur-xl;
+    background: linear-gradient(
+      160deg,
+      hsl(var(--card) / 0.96),
+      hsl(var(--background) / 0.9)
+    );
   }
 
   .hero-panel {
@@ -98,7 +128,7 @@
     border-radius: 9999px;
     background: radial-gradient(
       circle,
-      rgba(201, 136, 40, 0.2),
+      rgba(251, 191, 36, 0.22),
       transparent 68%
     );
     filter: blur(14px);
@@ -144,7 +174,7 @@
   .recent-item span,
   .helper-panel,
   .stat-detail {
-    @apply text-slate-600;
+    @apply text-muted-foreground;
   }
 
   .hero-copy {
@@ -156,7 +186,7 @@
   }
 
   .hero-tile {
-    @apply rounded-2xl border border-border bg-white p-5 shadow-sm;
+    @apply rounded-2xl border border-border bg-card/80 p-5 shadow-sm;
   }
 
   .hero-tile strong {
@@ -164,7 +194,7 @@
   }
 
   .hero-tile span {
-    @apply mt-1 block text-sm text-slate-500;
+    @apply mt-1 block text-sm text-muted-foreground;
   }
 
   .hero-list {
@@ -172,7 +202,7 @@
   }
 
   .hero-list li {
-    @apply flex gap-3 text-sm leading-6 text-slate-700;
+    @apply flex gap-3 text-sm leading-6 text-foreground/85;
   }
 
   .hero-list li::before {
@@ -225,7 +255,7 @@
   }
 
   .brand-name span {
-    @apply text-sm text-slate-500;
+    @apply text-sm text-muted-foreground;
   }
 
   .auth-panel-note {
@@ -241,7 +271,7 @@
   }
 
   .input {
-    @apply flex h-11 w-full rounded-xl border border-[#EFBF04] bg-[#76B3F4] px-4 py-2.5 text-sm text-primary shadow-sm transition placeholder:text-slate-700/80 focus:border-[#EFBF04] focus:outline-none focus:ring-4 focus:ring-[#EFBF04]/25 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply flex h-11 w-full rounded-xl border border-primary/25 bg-card/75 px-4 py-2.5 text-sm text-foreground shadow-sm transition placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-4 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .login-error {
@@ -262,15 +292,20 @@
   }
 
   .button-primary {
-    @apply bg-primary text-primary-foreground shadow-soft hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-lift focus:ring-primary/20;
+    @apply text-primary-foreground shadow-soft hover:-translate-y-0.5 hover:shadow-lift focus:ring-primary/25;
+    background-image: linear-gradient(
+      90deg,
+      hsl(var(--primary)),
+      hsl(var(--accent))
+    );
   }
 
   .button-secondary {
-    @apply border border-border bg-white text-secondary hover:-translate-y-0.5 hover:border-accent/30 hover:bg-accent/10 hover:text-primary focus:ring-accent/10;
+    @apply border border-border bg-card/75 text-foreground hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/10 hover:text-primary focus:ring-primary/15;
   }
 
   .button-ghost {
-    @apply border border-border bg-transparent text-slate-700 hover:bg-slate-100 focus:ring-slate-200;
+    @apply border border-border bg-transparent text-foreground/80 hover:bg-white/10 focus:ring-white/20;
   }
 
   .button-danger {
@@ -278,7 +313,7 @@
   }
 
   .mobile-topbar {
-    @apply sticky top-2 z-30 mb-4 flex items-center justify-between gap-3 rounded-3xl border border-border bg-white/95 px-4 py-4 shadow-soft backdrop-blur;
+    @apply sticky top-2 z-30 mb-4 flex items-center justify-between gap-3 rounded-3xl border border-border/90 bg-card/85 px-4 py-4 shadow-soft backdrop-blur;
   }
 
   .sidebar-trigger {
@@ -286,7 +321,7 @@
   }
 
   .mobile-menu-panel {
-    @apply mb-4 grid gap-4 rounded-3xl border border-border bg-white/95 p-5 shadow-soft backdrop-blur;
+    @apply mb-4 grid gap-4 rounded-3xl border border-border/90 bg-card/85 p-5 shadow-soft backdrop-blur;
   }
 
   .desktop-sidebar,
@@ -295,11 +330,11 @@
   }
 
   .desktop-sidebar {
-    @apply sticky top-4 hidden h-[calc(100vh-2rem)] self-start overflow-y-auto rounded-[2rem] border border-border bg-white/95 p-5 shadow-2xl backdrop-blur;
+    @apply sticky top-4 hidden h-[calc(100vh-2rem)] self-start overflow-y-auto rounded-[2rem] border border-border/90 bg-card/85 p-5 shadow-2xl backdrop-blur;
   }
 
   .mobile-sidebar {
-    @apply pointer-events-none fixed inset-y-0 left-0 z-50 w-[min(86vw,20rem)] -translate-x-full overflow-y-auto overscroll-contain bg-white p-5 shadow-2xl transition-transform duration-300 ease-out;
+    @apply pointer-events-none fixed inset-y-0 left-0 z-50 w-[min(86vw,20rem)] -translate-x-full overflow-y-auto overscroll-contain bg-card p-5 shadow-2xl transition-transform duration-300 ease-out;
   }
 
   .mobile-sidebar.is-open {
@@ -339,7 +374,7 @@
   }
 
   .sidebar-link {
-    @apply inline-flex items-center gap-3 rounded-2xl border border-transparent bg-slate-50 px-4 py-3 text-sm font-medium text-secondary transition hover:border-accent/30 hover:bg-accent/10 hover:text-primary;
+    @apply inline-flex items-center gap-3 rounded-2xl border border-transparent bg-white/5 px-4 py-3 text-sm font-medium text-foreground/85 transition hover:border-primary/30 hover:bg-primary/10 hover:text-primary;
   }
 
   .sidebar-link.is-active {
@@ -355,7 +390,7 @@
   }
 
   .pill {
-    @apply inline-flex items-center gap-2 rounded-full border border-border bg-slate-50 px-3.5 py-2 text-sm font-medium text-slate-700;
+    @apply inline-flex items-center gap-2 rounded-full border border-border bg-white/5 px-3.5 py-2 text-sm font-medium text-foreground/85;
   }
 
   .pill--gold {
@@ -371,7 +406,7 @@
   }
 
   .stat-label {
-    @apply text-xs sm:text-sm font-medium text-slate-500;
+    @apply text-xs sm:text-sm font-medium text-muted-foreground;
   }
 
   .stat-value {
@@ -417,7 +452,7 @@
   }
 
   .recent-item {
-    @apply flex items-start justify-between gap-4 rounded-2xl border border-border bg-slate-50 px-4 py-3;
+    @apply flex items-start justify-between gap-4 rounded-2xl border border-border bg-white/5 px-4 py-3;
   }
 
   .recent-item strong {
@@ -429,7 +464,7 @@
   }
 
   .recent-amount {
-    @apply whitespace-nowrap text-right text-sm font-semibold text-slate-900;
+    @apply whitespace-nowrap text-right text-sm font-semibold text-foreground;
   }
 
   .module-grid {
@@ -457,7 +492,7 @@
   }
 
   .empty-state {
-    @apply rounded-2xl border border-dashed border-border bg-slate-50 px-5 py-6 text-center text-sm text-slate-500;
+    @apply rounded-2xl border border-dashed border-border bg-white/5 px-5 py-6 text-center text-sm text-muted-foreground;
   }
 
   .page-hero {
@@ -485,7 +520,7 @@
   }
 
   .helper-text {
-    @apply mt-2 block text-sm text-slate-500;
+    @apply mt-2 block text-sm text-muted-foreground;
   }
 
   .record-field-label {
@@ -494,7 +529,7 @@
   }
 
   .record-field-helper {
-    @apply mt-1 text-sm leading-6 text-slate-500;
+    @apply mt-1 text-sm leading-6 text-muted-foreground;
   }
 
   .invoice-items {
@@ -515,7 +550,7 @@
 
   .approval-row,
   .helper-panel {
-    @apply mt-5 rounded-2xl border border-border bg-slate-50 p-4;
+    @apply mt-5 rounded-2xl border border-border bg-white/5 p-4;
   }
 
   .approval-row {
@@ -527,7 +562,7 @@
   }
 
   .helper-panel {
-    @apply text-sm text-slate-600;
+    @apply text-sm text-foreground/75;
   }
 
   .subtle-copy {
@@ -543,7 +578,7 @@
   }
 
   .record-table-wrapper {
-    @apply overflow-hidden rounded-2xl border border-border bg-white;
+    @apply overflow-hidden rounded-2xl border border-border bg-card/90;
   }
 
   .record-table {
@@ -556,7 +591,7 @@
   }
 
   .record-table th {
-    @apply bg-slate-50 font-semibold text-slate-700;
+    @apply bg-white/5 font-semibold text-foreground/85;
   }
 
   .sidebar-link svg {
@@ -584,7 +619,7 @@
   }
 
   .record-table tr {
-    @apply mb-3 overflow-hidden rounded-2xl border border-border bg-white shadow-sm;
+    @apply mb-3 overflow-hidden rounded-2xl border border-border bg-card/90 shadow-sm;
   }
 
   .record-table td {
@@ -593,7 +628,7 @@
 
   .record-table td::before {
     content: attr(data-label);
-    @apply text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 shrink-0 order-first;
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground shrink-0 order-first;
   }
 
   .record-table td:last-child {
