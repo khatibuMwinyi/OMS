@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
   username VARCHAR(100) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
   role ENUM('admin', 'secretary') NOT NULL DEFAULT 'secretary',
+  signature_image_path VARCHAR(500),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -28,10 +29,14 @@ CREATE TABLE IF NOT EXISTS invoices (
   vat DECIMAL(10,2) NOT NULL,
   discount DECIMAL(10,2) NOT NULL,
   grand_total DECIMAL(10,2) NOT NULL,
+  sent_at TIMESTAMP NULL,
+  sent_by INT,
+  sent_via ENUM('whatsapp', 'email'),
   user_id INT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_invoices_user_created (user_id, created_at),
-  FOREIGN KEY (user_id) REFERENCES users(id)
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (sent_by) REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS invoice_items (
@@ -61,10 +66,14 @@ CREATE TABLE IF NOT EXISTS receipts (
   branch_name VARCHAR(255),
   reference_number VARCHAR(255),
   receipt_date DATE NOT NULL,
+  sent_at TIMESTAMP NULL,
+  sent_by INT,
+  sent_via ENUM('whatsapp', 'email'),
   user_id INT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_receipts_user_created (user_id, created_at),
-  FOREIGN KEY (user_id) REFERENCES users(id)
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (sent_by) REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS petty_cash_transactions (
@@ -131,10 +140,20 @@ CREATE TABLE IF NOT EXISTS printed_letters (
   reference_number VARCHAR(50),
   description TEXT,
   pdf_path VARCHAR(500) NOT NULL,
+  status ENUM('pending', 'approved') NOT NULL DEFAULT 'pending',
+  approved_by INT,
+  approved_at TIMESTAMP NULL,
+  approved_signature_path VARCHAR(500),
+  sent_at TIMESTAMP NULL,
+  sent_by INT,
+  sent_via ENUM('whatsapp', 'email'),
   user_id INT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_printed_letters_status_created (status, created_at),
   KEY idx_printed_letters_user_created (user_id, created_at),
-  FOREIGN KEY (user_id) REFERENCES users(id)
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (approved_by) REFERENCES users(id),
+  FOREIGN KEY (sent_by) REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS letter_content (
