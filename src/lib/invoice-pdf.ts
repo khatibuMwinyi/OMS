@@ -3,6 +3,14 @@ import path from "node:path";
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
+import {
+  FIXED_BANK_ACCOUNT_NAME,
+  FIXED_BANK_ACCOUNT_NUMBER,
+  FIXED_BANK_NAME,
+  FIXED_MOBILE_HOLDER_NAME,
+  FIXED_MOBILE_NUMBER,
+  FIXED_MOBILE_OPERATOR,
+} from "@/lib/payment-defaults";
 import type { InvoiceItemRecord, InvoiceRecord } from "@/lib/records";
 
 const templateBytesCache = new Map<string, Promise<Uint8Array>>();
@@ -195,20 +203,30 @@ export async function buildInvoicePdf(
   const dueDateValue = addDays(document.invoice.invoiceDate, 30);
   const dueDate = dueDateValue ? formatDate(dueDateValue) : "-";
   const paymentMethod = document.invoice.paymentMethod ?? "Cash";
+  const bankName = FIXED_BANK_NAME;
+  const bankAccountNumber = FIXED_BANK_ACCOUNT_NUMBER;
+  const bankAccountName = FIXED_BANK_ACCOUNT_NAME;
+  const mobileOperator = FIXED_MOBILE_OPERATOR;
+  const mobileNumber = FIXED_MOBILE_NUMBER;
+  const mobileHolderName = FIXED_MOBILE_HOLDER_NAME;
   const paymentHeading =
     paymentMethod === "Bank Transfer"
-      ? (document.invoice.bankName ?? "Bank Transfer")
+      ? bankName
       : paymentMethod === "Mobile Money"
-        ? (document.invoice.mobileOperator ?? "Mobile Money")
+        ? mobileOperator
         : "Cash";
   const accountName =
     paymentMethod === "Mobile Money"
-      ? (document.invoice.mobileHolder ?? "Oweru International LTD")
-      : (document.invoice.holderName ?? "Oweru International LTD");
+      ? mobileHolderName
+      : paymentMethod === "Bank Transfer"
+        ? bankAccountName
+        : "-";
   const accountNumber =
     paymentMethod === "Mobile Money"
-      ? (document.invoice.mobileNumber ?? "-")
-      : (document.invoice.bankAccount ?? "-");
+      ? mobileNumber
+      : paymentMethod === "Bank Transfer"
+        ? bankAccountNumber
+        : "-";
 
   const rightLabelX = 424;
 
@@ -229,7 +247,7 @@ export async function buildInvoicePdf(
 
   page.drawText(`#${document.invoice.invoiceNumber || document.invoice.id}`, {
     x: rightLabelX,
-    y: pageHeight - 74,
+    y: pageHeight - 104,
     size: 20,
     font: boldFont,
     color: rgb(0.86, 0.42, 0.1), // Stronger brown/gold ribbon accent
@@ -237,7 +255,7 @@ export async function buildInvoicePdf(
 
   page.drawText(invoiceDate.toUpperCase(), {
     x: rightLabelX,
-    y: pageHeight - 92,
+    y: pageHeight - 124,
     size: 9.5,
     font: boldFont,
     color: text,
@@ -253,7 +271,7 @@ export async function buildInvoicePdf(
   page.drawText(`${paymentMethod} · ${paymentHeading}`, {
     x: rightLabelX,
     y: pageHeight - 224,
-    size: 10,
+    size: 11,
     font: regularFont,
     color: muted,
   });
@@ -262,20 +280,24 @@ export async function buildInvoicePdf(
     { bold: boldFont, regular: regularFont },
     rightLabelX,
     pageHeight - 276,
-    "Account",
+    "Account name",
     accountName,
     text,
     muted,
+    15.5,
+    11.5,
   );
   drawStackedField(
     page,
     { bold: boldFont, regular: regularFont },
     rightLabelX,
     pageHeight - 330,
-    "Number",
-    accountNumber === "-" ? "12345678" : accountNumber,
+    "Account number",
+    accountNumber,
     text,
     muted,
+    15.5,
+    11.5,
   );
   drawStackedField(
     page,
@@ -286,6 +308,8 @@ export async function buildInvoicePdf(
     dueDate,
     text,
     muted,
+    15.5,
+    11.5,
   );
 
   // Shift everything slightly right to align with the "INVOICE" header in the template
@@ -414,20 +438,22 @@ export async function buildInvoicePdf(
 
   const summaryLabelX = tableLeftX + 200;
   const summaryValueOpenX = tableLeftX + 280;
+  const summaryLabelSize = 11;
+  const summaryValueSize = 11.5;
   let summaryY = rowY - 20;
 
   // Modern clean labels and values
   page.drawText("Subtotal", {
     x: summaryLabelX,
     y: summaryY,
-    size: 10,
+    size: summaryLabelSize,
     font: regularFont,
     color: muted,
   });
   page.drawText(formatAmount(subtotal), {
     x: summaryValueOpenX,
     y: summaryY,
-    size: 10.5,
+    size: summaryValueSize,
     font: regularFont,
     color: text,
   });
@@ -436,14 +462,14 @@ export async function buildInvoicePdf(
   page.drawText(`Tax (${formatPercentage(taxRate)})`, {
     x: summaryLabelX,
     y: summaryY,
-    size: 10,
+    size: summaryLabelSize,
     font: regularFont,
     color: muted,
   });
   page.drawText(formatAmount(taxAmount), {
     x: summaryValueOpenX,
     y: summaryY,
-    size: 10.5,
+    size: summaryValueSize,
     font: regularFont,
     color: text,
   });
@@ -453,14 +479,14 @@ export async function buildInvoicePdf(
     page.drawText("Discount", {
       x: summaryLabelX,
       y: summaryY,
-      size: 10,
+      size: summaryLabelSize,
       font: regularFont,
       color: muted,
     });
     page.drawText(`- ${formatAmount(discount)}`, {
       x: summaryValueOpenX,
       y: summaryY,
-      size: 10.5,
+      size: summaryValueSize,
       font: regularFont,
       color: rgb(0.8, 0, 0),
     });
@@ -482,17 +508,17 @@ export async function buildInvoicePdf(
   page.drawText("Total Due", {
     x: totalBoxX + 8,
     y: summaryY + 5,
-    size: 10,
+    size: 10.5,
     font: boldFont,
     color: rgb(1, 1, 1), // White text
   });
 
   const totalStr = formatCurrency(grandTotal);
-  const totalValueWidth = boldFont.widthOfTextAtSize(totalStr, 11);
+  const totalValueWidth = boldFont.widthOfTextAtSize(totalStr, 11.5);
   page.drawText(totalStr, {
     x: totalBoxX + totalBoxWidth - totalValueWidth - 8,
     y: summaryY + 5,
-    size: 11,
+    size: 11.5,
     font: boldFont,
     color: rgb(1, 1, 1), // White text
   });

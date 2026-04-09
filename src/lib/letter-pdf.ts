@@ -89,6 +89,54 @@ function loadTemplateBytes(templateFileName: string) {
   return promise;
 }
 
+function resolveSignatureFilePath(signaturePath: string) {
+  const normalizedPath = signaturePath.trim().replace(/^\/+/, "");
+  return path.join(process.cwd(), "public", normalizedPath);
+}
+
+function getSignaturePathCandidates(
+  signaturePaths: Array<string | null | undefined>,
+) {
+  const candidates: string[] = [];
+
+  for (const signaturePath of signaturePaths) {
+    const normalizedPath = signaturePath?.trim() ?? "";
+    if (!normalizedPath) {
+      continue;
+    }
+
+    candidates.push(normalizedPath);
+
+    const extension = path.extname(normalizedPath).toLowerCase();
+    if (extension === ".png" || extension === ".jpg" || extension === ".jpeg") {
+      const basePath = normalizedPath.slice(0, -extension.length);
+      candidates.push(`${basePath}.png`);
+      candidates.push(`${basePath}.jpg`);
+      candidates.push(`${basePath}.jpeg`);
+      continue;
+    }
+
+    if (!extension) {
+      candidates.push(`${normalizedPath}.png`);
+      candidates.push(`${normalizedPath}.jpg`);
+      candidates.push(`${normalizedPath}.jpeg`);
+    }
+  }
+
+  return Array.from(new Set(candidates));
+}
+
+async function embedSignatureImage(pdfDoc: PDFDocument, signaturePath: string) {
+  const signatureBytes = await readFile(resolveSignatureFilePath(signaturePath));
+  const lowerPath = signaturePath.toLowerCase();
+
+  if (lowerPath.endsWith(".png")) {
+    return pdfDoc.embedPng(signatureBytes);
+  }
+
+  return pdfDoc.embedJpg(signatureBytes);
+}
+
 async function createPdfDocument(templateFileName?: string) {
   const pdfDoc = await PDFDocument.create();
 
@@ -114,6 +162,8 @@ export async function buildFormalLetterPdf(
     | "receiverAddress"
     | "heading"
     | "body"
+    | "status"
+    | "approvedSignaturePath"
   >,
 ) {
   const pdfDoc = await createPdfDocument("LETTER H.pdf");
@@ -227,7 +277,7 @@ export async function buildFormalLetterPdf(
   }
 
   cursorY -= lineSpacing;
-  const { customMessage, signature } = splitLetterBody(document.body);
+  const { customMessage } = splitLetterBody(document.body);
   const messageParagraphs = customMessage
     ? customMessage
         .split(/\n\n+/)
@@ -291,25 +341,39 @@ export async function buildFormalLetterPdf(
     cursorY -= lineSpacing; // Paragraph spacing
   }
 
-  if (
-    signature &&
-    !signature.toUpperCase().includes("DIRECTOR: OWERU INTERNATIONAL LTD")
-  ) {
-    const wrappedSignature = wrapTextByWidth(
-      signature,
-      regularFont,
-      fontSize,
-      bodyWidth,
-    );
-    for (const line of wrappedSignature) {
-      page.drawText(line, {
-        x: leftX,
-        y: cursorY,
-        size: fontSize,
-        font: regularFont,
-        color: dark,
-      });
-      cursorY -= lineSpacing;
+  if (document.status === "approved") {
+    // The template has "Yours faithfully," and "Pendo Joseph Oweru."
+    // We target the blank space between them dynamically maintaining aspect ratio.
+    const boundingX = leftX - 10;
+    const boundingY = 120;
+    const boxWidth = 145;
+    const boxHeight = 55;
+
+    const uniqueSignatureCandidates = getSignaturePathCandidates([
+      document.approvedSignaturePath,
+      process.env.ADMIN_SIGNATURE_IMAGE_PATH,
+    ]);
+
+    for (const signaturePath of uniqueSignatureCandidates) {
+      try {
+        const signatureImage = await embedSignatureImage(pdfDoc, signaturePath);
+
+        // Scale proportionally so the signature is not squished or stretched
+        const dims = signatureImage.scaleToFit(boxWidth, boxHeight);
+
+        // Position it centered inside that target blank space
+        page.drawImage(signatureImage, {
+          x: boundingX + (boxWidth - dims.width) / 2,
+          y: boundingY + (boxHeight - dims.height) / 2,
+          width: dims.width,
+          height: dims.height,
+        });
+
+        // Do not draw duplicate hardcoded text as template handles it
+        break;
+      } catch {
+        // Try next candidate path.
+      }
     }
   }
 

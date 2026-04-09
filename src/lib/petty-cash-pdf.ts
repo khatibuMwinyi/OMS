@@ -89,8 +89,8 @@ function drawStackedField(
   value: string,
   labelColor: ReturnType<typeof rgb>,
   valueColor: ReturnType<typeof rgb>,
-  labelSize = 15,
-  valueSize = 11,
+  labelSize = 15.5,
+  valueSize = 11.5,
 ) {
   page.drawText(label, {
     x,
@@ -145,7 +145,7 @@ export async function buildPettyCashPdf(document: PettyCashRecord) {
   // Top Right Info
   page.drawText(`#PCV${document.pettycashNumber || document.id}`, {
     x: rightLabelX,
-    y: pageHeight - 74,
+    y: pageHeight - 104,
     size: 20,
     font: boldFont,
     color: rgb(0.86, 0.42, 0.1),
@@ -153,7 +153,7 @@ export async function buildPettyCashPdf(document: PettyCashRecord) {
 
   page.drawText(formatDate(document.date).toUpperCase(), {
     x: rightLabelX,
-    y: pageHeight - 92,
+    y: pageHeight - 124,
     size: 9.5,
     font: boldFont,
     color: text,
@@ -276,17 +276,17 @@ export async function buildPettyCashPdf(document: PettyCashRecord) {
   page.drawText("Total", {
     x: totalBoxX + 8,
     y: summaryY + 5,
-    size: 10,
+    size: 10.5,
     font: boldFont,
     color: rgb(1, 1, 1),
   });
 
   const totalStr = formatCurrency(Number(document.amount));
-  const totalValWidth = boldFont.widthOfTextAtSize(totalStr, 11);
+  const totalValWidth = boldFont.widthOfTextAtSize(totalStr, 11.5);
   page.drawText(totalStr, {
     x: tableRightMax - totalValWidth - 8,
     y: summaryY + 5,
-    size: 11,
+    size: 11.5,
     font: boldFont,
     color: rgb(1, 1, 1),
   });

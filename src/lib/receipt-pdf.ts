@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
+import { FIXED_BANK_ACCOUNT_NAME, FIXED_BANK_ACCOUNT_NUMBER } from "@/lib/payment-defaults";
 import type { ReceiptRecord } from "@/lib/records";
 
 const templateBytesCache = new Map<string, Promise<Uint8Array>>();
@@ -89,8 +90,8 @@ function drawStackedField(
   value: string,
   labelColor: ReturnType<typeof rgb>,
   valueColor: ReturnType<typeof rgb>,
-  labelSize = 15,
-  valueSize = 11,
+  labelSize = 15.5,
+  valueSize = 11.5,
 ) {
   page.drawText(label, {
     x,
@@ -144,7 +145,7 @@ export async function buildReceiptPdf(document: ReceiptRecord) {
   // Header Right
   page.drawText(`#${document.receiptNumber}`, {
     x: rightLabelX,
-    y: pageHeight - 74,
+    y: pageHeight - 104,
     size: 20,
     font: boldFont,
     color: rgb(0.86, 0.42, 0.1), // Stronger brown/gold ribbon accent
@@ -152,7 +153,7 @@ export async function buildReceiptPdf(document: ReceiptRecord) {
 
   page.drawText(receiptDate.toUpperCase(), {
     x: rightLabelX,
-    y: pageHeight - 92,
+    y: pageHeight - 124,
     size: 9.5,
     font: boldFont,
     color: text,
@@ -199,8 +200,8 @@ export async function buildReceiptPdf(document: ReceiptRecord) {
       { bold: boldFont, regular: regularFont },
       rightLabelX,
       pageHeight - 350,
-      "Bank Details",
-      `${document.bankName || "-"} (${document.branchName || "Main"})`,
+      "Account name",
+      FIXED_BANK_ACCOUNT_NAME,
       text,
       muted,
     );
@@ -209,6 +210,16 @@ export async function buildReceiptPdf(document: ReceiptRecord) {
       { bold: boldFont, regular: regularFont },
       rightLabelX,
       pageHeight - 420,
+      "Account number",
+      FIXED_BANK_ACCOUNT_NUMBER,
+      text,
+      muted,
+    );
+    drawStackedField(
+      page,
+      { bold: boldFont, regular: regularFont },
+      rightLabelX,
+      pageHeight - 490,
       "Bank Reference",
       document.referenceNumber || "-",
       text,
@@ -314,14 +325,14 @@ export async function buildReceiptPdf(document: ReceiptRecord) {
   page.drawText("Subtotal", {
     x: summaryLabelX,
     y: summaryY,
-    size: 10,
+    size: 11,
     font: regularFont,
     color: muted,
   });
   page.drawText(formatAmount(Number(document.amount)), {
     x: summaryValueOpenX,
     y: summaryY,
-    size: 10.5,
+    size: 11.5,
     font: regularFont,
     color: text,
   });
@@ -342,31 +353,19 @@ export async function buildReceiptPdf(document: ReceiptRecord) {
   page.drawText("Total Paid", {
     x: totalBoxX + 8,
     y: summaryY + 5,
-    size: 10,
+    size: 10.5,
     font: boldFont,
     color: rgb(1, 1, 1),
   });
   
   const totalStr = formatCurrency(Number(document.amount));
-  const totalValueWidth = boldFont.widthOfTextAtSize(totalStr, 11);
+  const totalValueWidth = boldFont.widthOfTextAtSize(totalStr, 11.5);
   page.drawText(totalStr, {
     x: 412 - totalValueWidth - 8,
     y: summaryY + 5,
-    size: 11,
+    size: 11.5,
     font: boldFont,
     color: rgb(1, 1, 1),
-  });
-
-  // Footer (centered note)
-  const footerY = 120;
-  const note = "Thank you for your business!";
-  const noteWidth = regularFont.widthOfTextAtSize(note, 10);
-  page.drawText(note, {
-    x: (page.getWidth() - noteWidth) / 2,
-    y: footerY,
-    size: 10,
-    font: regularFont,
-    color: muted,
   });
 
   return await pdfDoc.save();
