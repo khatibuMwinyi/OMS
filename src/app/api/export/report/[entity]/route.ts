@@ -220,13 +220,6 @@ export async function GET(request: Request, { params }: RouteParams) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  if (session.role !== "admin") {
-    return NextResponse.json(
-      { error: "Admin access is required to export reports." },
-      { status: 403 },
-    );
-  }
-
   const { entity: entityParam } = await params;
   const entity = normalizeEntity(entityParam);
   if (!entity) {

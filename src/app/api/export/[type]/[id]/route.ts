@@ -8,6 +8,7 @@ import {
   getInvoiceDocument,
   getInvoiceDocumentPublic,
   getLetterDocument,
+  getLetterDocumentPublic,
   getIncomingLetterDocument,
   getPettyCashDocument,
   getReceiptDocument,
@@ -339,12 +340,20 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     pdfBytes = await buildVoucherPdf(document);
   } else if (type === "letter") {
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const document = await getLetterDocument(session, numericId);
+    const document = isPublicShareAccess
+      ? await getLetterDocumentPublic(numericId)
+      : session
+        ? await getLetterDocument(session, numericId)
+        : null;
     if (!document) {
       return NextResponse.json({ error: "Letter not found" }, { status: 404 });
+    }
+
+    if (isPublicShareAccess && document.status !== "approved") {
+      return NextResponse.json(
+        { error: "Letter is not approved for public sharing" },
+        { status: 403 },
+      );
     }
 
     pdfBytes = await buildFormalLetterPdf(document);

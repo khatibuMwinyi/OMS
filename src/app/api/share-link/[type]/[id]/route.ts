@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { getInvoiceDocument, getReceiptDocument } from "@/lib/records";
+import { execute } from "@/lib/db";
+import {
+  ensureDocumentWorkflowColumns,
+  getInvoiceDocument,
+  getLetterDocument,
+  getReceiptDocument,
+} from "@/lib/records";
 import {
   buildPublicShareBaseUrl,
   createPublicShareToken,
@@ -24,7 +30,26 @@ function normalizeType(raw: string): PublicShareType | null {
     return "receipt";
   }
 
+  if (value === "letter") {
+    return "letter";
+  }
+
   return null;
+}
+
+async function markDocumentSentViaWhatsApp(
+  tableName: "invoices" | "receipts" | "printed_letters",
+  id: number,
+  userId: number,
+) {
+  await execute(
+    `UPDATE ${tableName}
+     SET sent_at = IFNULL(sent_at, CURRENT_TIMESTAMP),
+         sent_by = CASE WHEN sent_at IS NULL THEN ? ELSE sent_by END,
+         sent_via = CASE WHEN sent_at IS NULL THEN 'whatsapp' ELSE sent_via END
+     WHERE id = ?`,
+    [userId, id],
+  );
 }
 
 export async function POST(request: Request, { params }: RouteParams) {
@@ -44,16 +69,38 @@ export async function POST(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "Invalid document id." }, { status: 400 });
   }
 
+  await ensureDocumentWorkflowColumns();
+
   if (type === "invoice") {
     const document = await getInvoiceDocument(session, numericId);
     if (!document) {
       return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
     }
-  } else {
+    await markDocumentSentViaWhatsApp("invoices", numericId, session.userId);
+  } else if (type === "receipt") {
     const document = await getReceiptDocument(session, numericId);
     if (!document) {
       return NextResponse.json({ error: "Receipt not found." }, { status: 404 });
     }
+    await markDocumentSentViaWhatsApp("receipts", numericId, session.userId);
+  } else {
+    const document = await getLetterDocument(session, numericId);
+    if (!document) {
+      return NextResponse.json({ error: "Letter not found." }, { status: 404 });
+    }
+
+    if (document.status !== "approved") {
+      return NextResponse.json(
+        { error: "Letter must be approved by admin before sending." },
+        { status: 409 },
+      );
+    }
+
+    await markDocumentSentViaWhatsApp(
+      "printed_letters",
+      numericId,
+      session.userId,
+    );
   }
 
   const ttlMinutes = getPublicShareLinkTtlMinutes();
