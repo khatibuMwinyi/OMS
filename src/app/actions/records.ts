@@ -1,6 +1,6 @@
 "use server";
 
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { access, mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -9,9 +9,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { execute, withTransaction } from "@/lib/db";
+import { execute, queryRows, withTransaction } from "@/lib/db";
 import {
-  getNextIncomingLetterReferenceNumber,
+  ensureDocumentWorkflowColumns,
   getNextInvoiceNumber,
   getNextLetterReferenceNumber,
   getNextPettyCashNumber,
@@ -58,6 +58,46 @@ function sanitizeFilename(value: string) {
     .replace(/[^a-z0-9]+/gi, "-")
     .replace(/^-+|-+$/g, "")
     .toLowerCase();
+}
+
+async function resolveExistingSignaturePath(signaturePath: string) {
+  const normalizedPath = signaturePath.trim();
+  if (!normalizedPath) {
+    return "";
+  }
+
+  const extension = path.extname(normalizedPath).toLowerCase();
+  const candidates = [normalizedPath];
+
+  if (extension === ".png" || extension === ".jpg" || extension === ".jpeg") {
+    const basePath = normalizedPath.slice(0, -extension.length);
+    candidates.push(`${basePath}.png`);
+    candidates.push(`${basePath}.jpg`);
+    candidates.push(`${basePath}.jpeg`);
+  } else if (!extension) {
+    candidates.push(`${normalizedPath}.png`);
+    candidates.push(`${normalizedPath}.jpg`);
+    candidates.push(`${normalizedPath}.jpeg`);
+  }
+
+  const uniqueCandidates = Array.from(new Set(candidates));
+
+  for (const candidate of uniqueCandidates) {
+    const absolutePath = path.join(
+      process.cwd(),
+      "public",
+      candidate.replace(/^\/+/, ""),
+    );
+
+    try {
+      await access(absolutePath);
+      return candidate;
+    } catch {
+      // Continue trying candidate paths.
+    }
+  }
+
+  return "";
 }
 
 function parseInvoiceItems(raw: FormDataEntryValue | null) {
@@ -248,6 +288,7 @@ const invoiceUpdateSchema = invoiceSchema.extend({
 
 export async function updateInvoiceAction(formData: FormData) {
   const session = await requireSession();
+  await ensureDocumentWorkflowColumns();
   const paymentMethod = asString(formData.get("payment_method")) || "Cash";
   const bankName =
     paymentMethod === "Bank Transfer" ? FIXED_BANK_NAME : null;
@@ -317,48 +358,45 @@ export async function updateInvoiceAction(formData: FormData) {
   const vat = formData.has("vat") ? asNumber(formData.get("vat")) : 0;
   const discount = asNumber(formData.get("discount"));
   const grandTotal = Math.max(subtotal + vat - discount, 0);
-  const accessClause = session.role === "admin" ? "" : " AND user_id = ?";
-  const invoiceParams =
-    session.role === "admin"
-      ? [
-          parsed.data.invoice_number,
-          parsed.data.tin,
-          parsed.data.invoice_date,
-          parsed.data.director,
-          parsed.data.phone,
-          paymentMethod,
-          bankAccount,
-          holderName,
-          bankName,
-          mobileNumber,
-          mobileHolder,
-          mobileOperator,
-          subtotal,
-          vat,
-          discount,
-          grandTotal,
-          parsed.data.invoice_id,
-        ]
-      : [
-          parsed.data.invoice_number,
-          parsed.data.tin,
-          parsed.data.invoice_date,
-          parsed.data.director,
-          parsed.data.phone,
-          paymentMethod,
-          bankAccount,
-          holderName,
-          bankName,
-          mobileNumber,
-          mobileHolder,
-          mobileOperator,
-          subtotal,
-          vat,
-          discount,
-          grandTotal,
-          parsed.data.invoice_id,
-          session.userId,
-        ];
+  const existingInvoiceRows = await queryRows<{ sentAt: string | null }>(
+    `SELECT sent_at AS sentAt
+     FROM invoices
+     WHERE id = ?
+     LIMIT 1`,
+    [parsed.data.invoice_id],
+  );
+  const existingInvoice = existingInvoiceRows[0];
+  if (!existingInvoice) {
+    goWithMessage("/invoices", "error", "Invoice not found.");
+  }
+
+  if (existingInvoice.sentAt) {
+    goWithMessage(
+      "/invoices",
+      "error",
+      "Sent invoices cannot be edited again.",
+    );
+  }
+
+  const invoiceParams = [
+    parsed.data.invoice_number,
+    parsed.data.tin,
+    parsed.data.invoice_date,
+    parsed.data.director,
+    parsed.data.phone,
+    paymentMethod,
+    bankAccount,
+    holderName,
+    bankName,
+    mobileNumber,
+    mobileHolder,
+    mobileOperator,
+    subtotal,
+    vat,
+    discount,
+    grandTotal,
+    parsed.data.invoice_id,
+  ];
 
   await withTransaction(async (connection) => {
     const [result] = await connection.execute<ResultSetHeader>(
@@ -367,7 +405,7 @@ export async function updateInvoiceAction(formData: FormData) {
            payment_method = ?, bank_account = ?, holder_name = ?, bank_name = ?,
            mobile_number = ?, mobile_holder = ?, mobile_operator = ?,
            subtotal = ?, vat = ?, discount = ?, grand_total = ?
-       WHERE id = ?${accessClause}`,
+       WHERE id = ?`,
       invoiceParams,
     );
 
@@ -516,6 +554,7 @@ export async function updateReceiptAction(
   }
 
   const session = await requireSession();
+  await ensureDocumentWorkflowColumns();
   const isAsync = asString(formData.get("__async")) === "1";
   const bankName = FIXED_BANK_NAME;
   const parsed = receiptUpdateSchema.safeParse({
@@ -536,47 +575,54 @@ export async function updateReceiptAction(
     );
   }
 
-  const accessClause = session.role === "admin" ? "" : " AND user_id = ?";
-  const params =
-    session.role === "admin"
-      ? [
-          parsed.data.receipt_number,
-          parsed.data.customer_name,
-          asString(formData.get("code")) || null,
-          asString(formData.get("type")) || null,
-          asString(formData.get("category")) || null,
-          asString(formData.get("description")) || null,
-          asString(formData.get("phone")) || null,
-          parsed.data.amount,
-          parsed.data.payment_method,
-          bankName,
-          asString(formData.get("reference_number")) || null,
-          parsed.data.receipt_date,
-          parsed.data.receipt_id,
-        ]
-      : [
-          parsed.data.receipt_number,
-          parsed.data.customer_name,
-          asString(formData.get("code")) || null,
-          asString(formData.get("type")) || null,
-          asString(formData.get("category")) || null,
-          asString(formData.get("description")) || null,
-          asString(formData.get("phone")) || null,
-          parsed.data.amount,
-          parsed.data.payment_method,
-          bankName,
-          asString(formData.get("reference_number")) || null,
-          parsed.data.receipt_date,
-          parsed.data.receipt_id,
-          session.userId,
-        ];
+  const existingReceiptRows = await queryRows<{ sentAt: string | null }>(
+    `SELECT sent_at AS sentAt
+     FROM receipts
+     WHERE id = ?
+     LIMIT 1`,
+    [parsed.data.receipt_id],
+  );
+  const existingReceipt = existingReceiptRows[0];
+  if (!existingReceipt) {
+    return finishReceiptAction(
+      "/receipts",
+      "error",
+      "Receipt not found.",
+      isAsync,
+    );
+  }
+
+  if (existingReceipt.sentAt) {
+    return finishReceiptAction(
+      "/receipts",
+      "error",
+      "Sent receipts cannot be edited again.",
+      isAsync,
+    );
+  }
+
+  const params = [
+    parsed.data.receipt_number,
+    parsed.data.customer_name,
+    asString(formData.get("code")) || null,
+    asString(formData.get("type")) || null,
+    asString(formData.get("category")) || null,
+    asString(formData.get("description")) || null,
+    asString(formData.get("phone")) || null,
+    parsed.data.amount,
+    parsed.data.payment_method,
+    bankName,
+    asString(formData.get("reference_number")) || null,
+    parsed.data.receipt_date,
+    parsed.data.receipt_id,
+  ];
 
   const result = await execute(
     `UPDATE receipts
      SET receipt_number = ?, customer_name = ?, code = ?, type = ?, category = ?, description = ?,
          phone = ?, amount = ?, payment_method = ?, bank_name = ?,
          reference_number = ?, receipt_date = ?
-     WHERE id = ?${accessClause}`,
+     WHERE id = ?`,
     params,
   );
 
@@ -660,6 +706,71 @@ const voucherSchema = z.object({
   amount: z.coerce.number().positive(),
 });
 
+function parseVoucherPaymentDetails(formData: FormData, paymentMethod: string) {
+  const bankNameInput = asString(formData.get("bank_name"));
+  const accountNumberInput = asString(formData.get("account_number"));
+  const accountNameInput = asString(formData.get("account_name"));
+  const bankReferenceInput = asString(formData.get("bank_reference"));
+  const mobileNumberInput = asString(formData.get("mobile_number"));
+  const payerNameInput = asString(formData.get("payer_name"));
+  const mobileReferenceInput = asString(formData.get("mobile_reference"));
+
+  if (paymentMethod === "Bank Transfer") {
+    if (
+      !bankNameInput ||
+      !accountNumberInput ||
+      !accountNameInput ||
+      !bankReferenceInput
+    ) {
+      goWithMessage(
+        "/payment-vouchers",
+        "error",
+        "Beneficiary bank name, account number, account name, and reference number are required for bank transfer vouchers.",
+      );
+    }
+
+    return {
+      bankName: bankNameInput,
+      accountNumber: accountNumberInput,
+      accountName: accountNameInput,
+      bankReference: bankReferenceInput,
+      mobileNumber: null,
+      payerName: null,
+      mobileReference: null,
+    };
+  }
+
+  if (paymentMethod === "Mobile Transaction") {
+    if (!mobileNumberInput || !payerNameInput || !mobileReferenceInput) {
+      goWithMessage(
+        "/payment-vouchers",
+        "error",
+        "Beneficiary mobile number, beneficiary name, and reference number are required for mobile transaction vouchers.",
+      );
+    }
+
+    return {
+      bankName: null,
+      accountNumber: null,
+      accountName: null,
+      bankReference: null,
+      mobileNumber: mobileNumberInput,
+      payerName: payerNameInput,
+      mobileReference: mobileReferenceInput,
+    };
+  }
+
+  return {
+    bankName: null,
+    accountNumber: null,
+    accountName: null,
+    bankReference: null,
+    mobileNumber: null,
+    payerName: null,
+    mobileReference: null,
+  };
+}
+
 export async function createVoucherAction(formData: FormData) {
   const session = await requireSession();
   const parsed = voucherSchema.safeParse({
@@ -680,24 +791,25 @@ export async function createVoucherAction(formData: FormData) {
   }
 
   const paymentMethod = parsed.data.payment_method;
-  const bankName = paymentMethod === "Bank Transfer" ? FIXED_BANK_NAME : null;
-  const accountNumber =
-    paymentMethod === "Bank Transfer" ? FIXED_BANK_ACCOUNT_NUMBER : null;
-  const accountName =
-    paymentMethod === "Bank Transfer" ? FIXED_BANK_ACCOUNT_NAME : null;
-  const mobileNumber =
-    paymentMethod === "Mobile Transaction" ? FIXED_MOBILE_NUMBER : null;
-  const payerName =
-    paymentMethod === "Mobile Transaction" ? FIXED_MOBILE_HOLDER_NAME : null;
-  const mobileReference =
-    paymentMethod === "Mobile Transaction" ? asString(formData.get("mobile_reference")) || null : null;
+  const {
+    bankName,
+    accountNumber,
+    accountName,
+    bankReference,
+    mobileNumber,
+    payerName,
+    mobileReference,
+  } = parseVoucherPaymentDetails(formData, paymentMethod);
+  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const autoApprove = session.role === "admin";
 
   await execute(
     `INSERT INTO payment_vouchers (
       voucher_number, date, customer_name, payment_method, bank_name, account_number,
       account_name, bank_reference, mobile_number, payer_name, mobile_reference,
-      code, type, category, description, amount, status, user_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)`,
+      code, type, category, description, amount, status, admin_comment,
+      approved_by, approved_at, rejected_by, rejected_at, user_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
     [
       parsed.data.voucher_number,
       parsed.data.date,
@@ -706,7 +818,7 @@ export async function createVoucherAction(formData: FormData) {
       bankName,
       accountNumber,
       accountName,
-      asString(formData.get("bank_reference")) || null,
+      bankReference,
       mobileNumber,
       payerName,
       mobileReference,
@@ -715,6 +827,12 @@ export async function createVoucherAction(formData: FormData) {
       parsed.data.category,
       parsed.data.description,
       parsed.data.amount,
+      autoApprove ? "approved" : "pending",
+      null,
+      autoApprove ? session.userId : null,
+      autoApprove ? now : null,
+      null,
+      null,
       session.userId,
     ],
   );
@@ -724,13 +842,147 @@ export async function createVoucherAction(formData: FormData) {
   goWithMessage(
     "/payment-vouchers",
     "status",
-    "Payment voucher saved successfully.",
+    autoApprove
+      ? "Payment voucher created and approved automatically."
+      : "Payment voucher submitted for admin approval.",
+  );
+}
+
+const voucherUpdateSchema = voucherSchema.extend({
+  voucher_id: z.coerce.number().int().positive(),
+});
+
+export async function updateVoucherAction(formData: FormData) {
+  const session = await requireSession();
+  const parsed = voucherUpdateSchema.safeParse({
+    voucher_id: formData.get("voucher_id"),
+    voucher_number: formData.get("voucher_number"),
+    date: formData.get("date"),
+    payment_method: formData.get("payment_method"),
+    category: formData.get("category"),
+    description: formData.get("description"),
+    amount: asNumber(formData.get("amount")),
+  });
+
+  if (!parsed.success) {
+    goWithMessage(
+      "/payment-vouchers",
+      "error",
+      parsed.error.issues[0]?.message ?? "Invalid voucher data",
+    );
+  }
+
+  const [existingVoucher] = await queryRows<{
+    status: "pending" | "approved" | "rejected";
+  }>(
+    `SELECT status
+     FROM payment_vouchers
+     WHERE id = ?
+     LIMIT 1`,
+    [parsed.data.voucher_id],
+  );
+
+  if (!existingVoucher) {
+    goWithMessage("/payment-vouchers", "error", "Payment voucher not found.");
+  }
+
+  if (existingVoucher.status === "approved") {
+    goWithMessage(
+      "/payment-vouchers",
+      "error",
+      "Approved vouchers cannot be edited.",
+    );
+  }
+
+  if (session.role === "secretary" && existingVoucher.status !== "rejected") {
+    goWithMessage(
+      "/payment-vouchers",
+      "error",
+      "Only rejected vouchers can be edited by secretary.",
+    );
+  }
+
+  const paymentMethod = parsed.data.payment_method;
+  const {
+    bankName,
+    accountNumber,
+    accountName,
+    bankReference,
+    mobileNumber,
+    payerName,
+    mobileReference,
+  } = parseVoucherPaymentDetails(formData, paymentMethod);
+  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const autoApprove = session.role === "admin";
+
+  const result = await execute(
+    `UPDATE payment_vouchers
+     SET voucher_number = ?,
+         date = ?,
+         customer_name = ?,
+         payment_method = ?,
+         bank_name = ?,
+         account_number = ?,
+         account_name = ?,
+         bank_reference = ?,
+         mobile_number = ?,
+         payer_name = ?,
+         mobile_reference = ?,
+         code = ?,
+         type = ?,
+         category = ?,
+         description = ?,
+         amount = ?,
+         status = ?,
+         admin_comment = NULL,
+         approved_by = ?,
+         approved_at = ?,
+         rejected_by = NULL,
+         rejected_at = NULL
+     WHERE id = ?`,
+    [
+      parsed.data.voucher_number,
+      parsed.data.date,
+      asString(formData.get("customer_name")) || null,
+      paymentMethod,
+      bankName,
+      accountNumber,
+      accountName,
+      bankReference,
+      mobileNumber,
+      payerName,
+      mobileReference,
+      asString(formData.get("code")) || null,
+      asString(formData.get("type")) || null,
+      parsed.data.category,
+      parsed.data.description,
+      parsed.data.amount,
+      autoApprove ? "approved" : "pending",
+      autoApprove ? session.userId : null,
+      autoApprove ? now : null,
+      parsed.data.voucher_id,
+    ],
+  );
+
+  if (result.affectedRows === 0) {
+    goWithMessage("/payment-vouchers", "error", "Payment voucher not found.");
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/payment-vouchers");
+  goWithMessage(
+    "/payment-vouchers",
+    "status",
+    autoApprove
+      ? "Payment voucher updated and approved automatically."
+      : "Payment voucher updated and resubmitted for admin approval.",
   );
 }
 
 const voucherStatusSchema = z.object({
   voucher_id: z.coerce.number().int().positive(),
   status: z.enum(["approved", "rejected"]),
+  admin_comment: z.string().trim().optional(),
 });
 
 export async function updateVoucherStatusAction(formData: FormData) {
@@ -746,6 +998,7 @@ export async function updateVoucherStatusAction(formData: FormData) {
   const parsed = voucherStatusSchema.safeParse({
     voucher_id: formData.get("voucher_id"),
     status: formData.get("status"),
+    admin_comment: formData.get("admin_comment"),
   });
 
   if (!parsed.success) {
@@ -756,21 +1009,32 @@ export async function updateVoucherStatusAction(formData: FormData) {
     );
   }
 
+  const adminComment = parsed.data.admin_comment?.trim() ?? "";
+  if (parsed.data.status === "rejected" && !adminComment) {
+    goWithMessage(
+      "/payment-vouchers",
+      "error",
+      "Provide a rejection comment so secretary can edit and resubmit.",
+    );
+  }
+
   const now = new Date().toISOString().slice(0, 19).replace("T", " ");
 
   if (parsed.data.status === "approved") {
     await execute(
       `UPDATE payment_vouchers
-       SET status = 'approved', approved_by = ?, approved_at = ?, rejected_by = NULL, rejected_at = NULL
+       SET status = 'approved', admin_comment = NULL,
+           approved_by = ?, approved_at = ?, rejected_by = NULL, rejected_at = NULL
        WHERE id = ?`,
       [session.userId, now, parsed.data.voucher_id],
     );
   } else {
     await execute(
       `UPDATE payment_vouchers
-       SET status = 'rejected', rejected_by = ?, rejected_at = ?, approved_by = NULL, approved_at = NULL
+       SET status = 'rejected', admin_comment = ?,
+           rejected_by = ?, rejected_at = ?, approved_by = NULL, approved_at = NULL
        WHERE id = ?`,
-      [session.userId, now, parsed.data.voucher_id],
+      [adminComment, session.userId, now, parsed.data.voucher_id],
     );
   }
 
@@ -781,7 +1045,7 @@ export async function updateVoucherStatusAction(formData: FormData) {
     "status",
     parsed.data.status === "approved"
       ? "Voucher approved."
-      : "Voucher rejected.",
+      : "Voucher rejected with comment.",
   );
 }
 
@@ -848,15 +1112,93 @@ export async function createLetterAction(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath("/letters");
-  goWithMessage("/letters", "status", "Letter saved successfully.");
+  goWithMessage(
+    "/letters",
+    "status",
+    session.role === "secretary"
+      ? "Letter submitted and waiting for admin approval."
+      : "Letter saved successfully.",
+  );
 }
 
 const letterUpdateSchema = letterSchema.extend({
   letter_id: z.coerce.number().int().positive(),
 });
 
+const letterApprovalSchema = z.object({
+  letter_id: z.coerce.number().int().positive(),
+});
+
+export async function approveLetterAction(formData: FormData) {
+  const session = await requireSession();
+  await ensureDocumentWorkflowColumns();
+  if (session.role !== "admin") {
+    goWithMessage("/letters", "error", "Only admins can approve letters.");
+  }
+
+  const parsed = letterApprovalSchema.safeParse({
+    letter_id: formData.get("letter_id"),
+  });
+
+  if (!parsed.success) {
+    goWithMessage("/letters", "error", "Invalid letter approval request.");
+  }
+
+  const [adminSignature] = await queryRows<{ signatureImagePath: string | null }>(
+    `SELECT signature_image_path AS signatureImagePath
+     FROM users
+     WHERE id = ?
+     LIMIT 1`,
+    [session.userId],
+  );
+
+  const configuredSignaturePath =
+    adminSignature?.signatureImagePath?.trim() ||
+    process.env.ADMIN_SIGNATURE_IMAGE_PATH?.trim() ||
+    "";
+
+  if (!configuredSignaturePath) {
+    goWithMessage(
+      "/letters",
+      "error",
+      "Admin signature is not configured. Set users.signature_image_path or ADMIN_SIGNATURE_IMAGE_PATH.",
+    );
+  }
+
+  const approvedSignaturePath = await resolveExistingSignaturePath(
+    configuredSignaturePath,
+  );
+
+  if (!approvedSignaturePath) {
+    goWithMessage(
+      "/letters",
+      "error",
+      "Admin signature image file was not found. Update users.signature_image_path or ADMIN_SIGNATURE_IMAGE_PATH.",
+    );
+  }
+
+  const result = await execute(
+    `UPDATE printed_letters
+     SET status = 'approved',
+         approved_by = ?,
+         approved_at = CURRENT_TIMESTAMP,
+         approved_signature_path = ?
+     WHERE id = ?`,
+    [session.userId, approvedSignaturePath, parsed.data.letter_id],
+  );
+
+  if (result.affectedRows === 0) {
+    goWithMessage("/letters", "error", "Letter not found.");
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/letters");
+  goWithMessage("/letters", "status", "Letter approved successfully.");
+}
+
 export async function updateLetterAction(formData: FormData) {
   const session = await requireSession();
+  await ensureDocumentWorkflowColumns();
   const parsed = letterUpdateSchema.safeParse({
     letter_id: formData.get("letter_id"),
     recipient_name: formData.get("recipient_name"),
@@ -874,12 +1216,39 @@ export async function updateLetterAction(formData: FormData) {
     );
   }
 
+  const currentLetterRows = await queryRows<{ status: "pending" | "approved" }>(
+    `SELECT status
+     FROM printed_letters
+     WHERE id = ?
+     LIMIT 1`,
+    [parsed.data.letter_id],
+  );
+  const currentLetter = currentLetterRows[0];
+
+  if (!currentLetter) {
+    goWithMessage("/letters", "error", "Letter not found.");
+  }
+
+  if (session.role !== "admin" && currentLetter.status !== "pending") {
+    goWithMessage(
+      "/letters",
+      "error",
+      "Approved letters can only be edited by admin.",
+    );
+  }
+
   await withTransaction(async (connection) => {
+    const updateParams = [
+      parsed.data.recipient_name,
+      parsed.data.subject,
+      parsed.data.letter_id,
+    ];
+
     const [result] = await connection.execute<ResultSetHeader>(
       `UPDATE printed_letters
        SET name = ?, description = ?
        WHERE id = ?`,
-      [parsed.data.recipient_name, parsed.data.subject, parsed.data.letter_id],
+      updateParams,
     );
 
     if (result.affectedRows === 0) {
@@ -910,6 +1279,7 @@ export async function updateLetterAction(formData: FormData) {
 }
 
 const incomingLetterSchema = z.object({
+  reference_number: z.string().trim().min(1, "Reference number is required"),
   sender_name: z.string().min(1, "Sender name is required"),
   sender_organization: z.string().optional(),
   subject: z.string().min(1, "Subject is required"),
@@ -919,9 +1289,9 @@ const incomingLetterSchema = z.object({
 
 export async function createIncomingLetterAction(formData: FormData) {
   const session = await requireSession();
-  const referenceNumber = await getNextIncomingLetterReferenceNumber();
   const fileEntry = formData.get("letter_file");
   const parsed = incomingLetterSchema.safeParse({
+    reference_number: formData.get("reference_number"),
     sender_name: formData.get("sender_name"),
     sender_organization: formData.get("sender_organization"),
     subject: formData.get("subject"),
@@ -978,7 +1348,7 @@ export async function createIncomingLetterAction(formData: FormData) {
         user_id
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        referenceNumber,
+        parsed.data.reference_number,
         parsed.data.sender_name,
         parsed.data.sender_organization || null,
         parsed.data.subject,

@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { execute, queryRows } from "@/lib/db";
+import { execute, isDatabaseConnectivityError, queryRows } from "@/lib/db";
 import { getCurrentSession } from "@/lib/session-server";
 import {
   SESSION_COOKIE_NAME,
@@ -14,6 +14,7 @@ import {
   buildSessionCookieOptions,
   createSessionToken,
 } from "@/lib/session";
+import { ensureDocumentWorkflowColumns } from "@/lib/records";
 
 const loginSchema = z.object({
   username: z.string().trim().min(1, "Username is required"),
@@ -44,10 +45,23 @@ export async function loginAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid credentials" };
   }
 
-  const [user] = await queryRows<LoginUserRow>(
-    "SELECT id, username, password, role FROM users WHERE username = ? LIMIT 1",
-    [parsed.data.username],
-  );
+  let user: LoginUserRow | undefined;
+
+  try {
+    [user] = await queryRows<LoginUserRow>(
+      "SELECT id, username, password, role FROM users WHERE username = ? LIMIT 1",
+      [parsed.data.username],
+    );
+  } catch (error) {
+    if (isDatabaseConnectivityError(error)) {
+      return {
+        error:
+          "Unable to connect to the database. Check MySQL service and DB_HOST/DB_PORT settings.",
+      };
+    }
+
+    throw error;
+  }
 
   if (!user) {
     return { error: "Invalid credentials" };
@@ -64,10 +78,22 @@ export async function loginAction(
 
   if (!isHashed) {
     const hashedPassword = await bcrypt.hash(parsed.data.password, 10);
-    await execute("UPDATE users SET password = ? WHERE id = ?", [
-      hashedPassword,
-      user.id,
-    ]);
+
+    try {
+      await execute("UPDATE users SET password = ? WHERE id = ?", [
+        hashedPassword,
+        user.id,
+      ]);
+    } catch (error) {
+      if (isDatabaseConnectivityError(error)) {
+        return {
+          error:
+            "Unable to connect to the database. Check MySQL service and DB_HOST/DB_PORT settings.",
+        };
+      }
+
+      throw error;
+    }
   }
 
   const sessionToken = createSessionToken({
@@ -96,6 +122,7 @@ const createUserSchema = z.object({
   username: z.string().trim().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
   role: z.enum(["admin", "secretary"]),
+  signature_image_path: z.string().trim().optional(),
 });
 
 export async function createUserAction(
@@ -110,6 +137,7 @@ export async function createUserAction(
     username: formData.get("username"),
     password: formData.get("password"),
     role: formData.get("role"),
+    signature_image_path: formData.get("signature_image_path"),
   });
 
   if (!parsed.success) {
@@ -121,13 +149,20 @@ export async function createUserAction(
   }
 
   const hashedPassword = await bcrypt.hash(parsed.data.password, 10);
+  await ensureDocumentWorkflowColumns();
+  const signatureImagePath =
+    parsed.data.signature_image_path?.trim() || null;
 
   try {
-    await execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", [
-      parsed.data.username,
-      hashedPassword,
-      parsed.data.role,
-    ]);
+    await execute(
+      "INSERT INTO users (username, password, role, signature_image_path) VALUES (?, ?, ?, ?)",
+      [
+        parsed.data.username,
+        hashedPassword,
+        parsed.data.role,
+        signatureImagePath,
+      ],
+    );
   } catch (error) {
     if (error instanceof Error && error.message.includes("Duplicate entry")) {
       redirect("/admin/users?error=That%20username%20already%20exists.");
