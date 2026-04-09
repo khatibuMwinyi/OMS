@@ -61,6 +61,10 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
     redirect("/receipts?error=Receipt%20not%20found.");
   }
 
+  if (isEditing && editDocument?.sentAt) {
+    redirect("/receipts?error=Sent%20receipts%20cannot%20be%20edited.");
+  }
+
   const nextReceiptNumber = isEditing
     ? editDocument?.receiptNumber ?? ""
     : await getNextReceiptNumber();
@@ -136,17 +140,13 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
               date={resolvedSearchParams.date ?? ""}
               month={resolvedSearchParams.month ?? ""}
               week={resolvedSearchParams.week ?? ""}
-              downloadOptions={
-                session.role === "admin"
-                  ? [
-                      {
-                        label: "Download receipts report",
-                        href: "/api/export/report/receipts",
-                      },
-                    ]
-                  : undefined
-              }
-              className="mb-4 flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-white p-4"
+              downloadOptions={[
+                {
+                  label: "Download receipts report",
+                  href: "/api/export/report/receipts",
+                },
+              ]}
+              className="mb-4 flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-card/95 p-4"
             />
 
             <RecentRecords
@@ -158,6 +158,7 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
                 value: "Amount",
               }}
               getShareDocument={(item) => {
+                const source = receipts.find((record) => record.id === item.id);
                 const summary =
                   receiptSummaries.get(item.id) ?? `Receipt ${item.title}`;
 
@@ -165,14 +166,22 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
                   type: "receipt",
                   title: `Receipt ${item.title}`,
                   summary,
+                  recipientPhone: source?.phone ?? null,
                 };
               }}
-              getEditHref={(item) => `/receipts?edit=${item.id}`}
+              getEditHref={(item) => {
+                const source = receipts.find((record) => record.id === item.id);
+                if (!source || source.sentAt) {
+                  return null;
+                }
+
+                return `/receipts?edit=${item.id}`;
+              }}
               getDownloadHref={(item) => `/api/export/receipt/${item.id}`}
               items={receipts.map((item) => ({
                 id: item.id,
                 title: item.receiptNumber,
-                subtitle: `${item.customerName} · ${formatDate(item.receiptDate)} · ${item.paymentMethod}`,
+                subtitle: `${item.customerName} · ${formatDate(item.receiptDate)} · ${item.paymentMethod}${item.sentAt ? " · sent" : ""}`,
                 value: formatTZS(Number(item.amount ?? 0)),
               }))}
             />

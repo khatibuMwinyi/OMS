@@ -5,6 +5,7 @@ import { RecordFieldRow } from "@/components/record-field-row";
 import { RecentRecords } from "@/components/recent-records";
 import { ReportPeriodTabs } from "@/components/report-period-tabs";
 import { RouteToast } from "@/components/route-toast";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +22,7 @@ import {
   createLetterAction,
   updateLetterAction,
   createIncomingLetterAction,
+  approveLetterAction,
 } from "../actions/records";
 
 function formatDate(value: string) {
@@ -29,6 +31,22 @@ function formatDate(value: string) {
     month: "short",
     year: "numeric",
   }).format(new Date(value));
+}
+
+function renderLetterStatus(status: "pending" | "approved") {
+  if (status === "approved") {
+    return (
+      <Badge variant="success" className="px-2 py-0.5 text-[10px]">
+        Approved
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge variant="warning" className="px-2 py-0.5 text-[10px]">
+      Pending Approval
+    </Badge>
+  );
 }
 
 type PageProps = {
@@ -97,6 +115,17 @@ export default async function LettersPage({ searchParams }: PageProps) {
     redirect("/letters?error=Letter%20not%20found.");
   }
 
+  if (
+    isEditing &&
+    editDocument &&
+    session.role !== "admin" &&
+    editDocument.status !== "pending"
+  ) {
+    redirect(
+      "/letters?error=Approved%20letters%20can%20only%20be%20edited%20by%20admin.",
+    );
+  }
+
   const letters = await listLetters(
     session,
     1000,
@@ -120,11 +149,20 @@ export default async function LettersPage({ searchParams }: PageProps) {
         item.name,
         item.description,
         item.heading,
+        item.status,
       ]
         .filter(Boolean)
         .some((value) => value!.toLowerCase().includes(lettersQuery));
     })
     .slice(0, 20);
+  const pendingLetters = letters.filter((item) => item.status === "pending");
+  const selectedPendingLetterId = pendingLetters[0]?.id ?? "";
+  const pendingAlertText =
+    pendingLetters.length === 0
+      ? ""
+      : session.role === "admin"
+        ? `${pendingLetters.length} letter${pendingLetters.length === 1 ? " is" : "s are"} waiting for your approval.`
+        : `${pendingLetters.length} letter${pendingLetters.length === 1 ? " is" : "s are"} waiting for admin approval.`;
   const filteredIncomingLetters = incomingLetters
     .filter((item) => {
       if (!incomingQuery) {
@@ -157,8 +195,8 @@ export default async function LettersPage({ searchParams }: PageProps) {
             <span className="eyebrow text-primary font-semibold">
               Documents
             </span>
-            <h1 className="page-title text-slate-950">Letters</h1>
-            <p className="subtle-copy text-slate-600">
+            <h1 className="page-title text-foreground">Letters</h1>
+            <p className="subtle-copy text-foreground/75">
               Create and print official letters to send to recipients and keep
               records.
             </p>
@@ -169,6 +207,12 @@ export default async function LettersPage({ searchParams }: PageProps) {
           status={resolvedSearchParams.status}
           error={resolvedSearchParams.error}
         />
+
+        {pendingAlertText ? (
+          <div className="mb-4 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm font-semibold text-primary">
+            {pendingAlertText}
+          </div>
+        ) : null}
 
         <section className="module-grid module-grid--single">
           <section className="section-card form-card">
@@ -192,9 +236,9 @@ export default async function LettersPage({ searchParams }: PageProps) {
                   readOnly
                 />
               ) : null}
-              <div className="overflow-hidden rounded-3xl border border-border bg-white">
-                <div className="border-b border-border/70 px-5 py-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <div className="overflow-hidden rounded-3xl border border-border bg-card/95">
+                <div className="border-b border-border/85 px-5 py-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                     Recipient details
                   </h3>
                 </div>
@@ -236,9 +280,9 @@ export default async function LettersPage({ searchParams }: PageProps) {
                 </RecordFieldRow>
               </div>
 
-              <div className="overflow-hidden rounded-3xl border border-border bg-white">
-                <div className="border-b border-border/70 px-5 py-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <div className="overflow-hidden rounded-3xl border border-border bg-card/95">
+                <div className="border-b border-border/85 px-5 py-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                     Letter content
                   </h3>
                 </div>
@@ -259,7 +303,7 @@ export default async function LettersPage({ searchParams }: PageProps) {
 
               <div className="button-row">
                 <Button type="submit">
-                  {isEditing ? "Update letter" : "Save letter"}
+                  {isEditing ? "Update letter" : "Create letter"}
                 </Button>
               </div>
             </form>
@@ -283,17 +327,13 @@ export default async function LettersPage({ searchParams }: PageProps) {
               searchParamKey="letters_q"
               defaultSearchQuery={resolvedSearchParams.letters_q ?? ""}
               searchPlaceholder="Search recipient, subject, or reference"
-              downloadOptions={
-                session.role === "admin"
-                  ? [
-                      {
-                        label: "Download letters report",
-                        href: "/api/export/report/letters",
-                      },
-                    ]
-                  : undefined
-              }
-              className="mb-4 flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-white p-4"
+              downloadOptions={[
+                {
+                  label: "Download letters report",
+                  href: "/api/export/report/letters",
+                },
+              ]}
+              className="mb-4 flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-card/95 p-4"
             />
 
             <RecentRecords
@@ -305,10 +345,39 @@ export default async function LettersPage({ searchParams }: PageProps) {
               }
               columns={{
                 record: "Recipient",
-                details: "Subject",
-                value: "Created",
+                details: "Subject / Created",
+                value: "Status",
               }}
-              getEditHref={(item) => `/letters?edit=${item.id}`}
+              getShareDocument={(item) => {
+                const source = filteredLetters.find((record) => record.id === item.id);
+                if (!source || source.status !== "approved") {
+                  return null;
+                }
+
+                return {
+                  type: "letter",
+                  title: `Letter ${source.referenceNumber ?? source.id}`,
+                  summary: [
+                    `Recipient: ${source.name}`,
+                    `Subject: ${source.heading ?? source.description ?? "Official letter"}`,
+                    `Status: ${source.status}`,
+                  ].join("\n"),
+                };
+              }}
+              getEditHref={(item) => {
+                const source = filteredLetters.find((record) => record.id === item.id);
+                if (!source) {
+                  return null;
+                }
+
+                if (session.role === "admin") {
+                  return `/letters?edit=${item.id}`;
+                }
+
+                return source.status === "pending"
+                  ? `/letters?edit=${item.id}`
+                  : null;
+              }}
               getDownloadHref={(item) => `/api/export/letter/${item.id}`}
               items={filteredLetters.map((item) => ({
                 id: item.id,
@@ -317,28 +386,70 @@ export default async function LettersPage({ searchParams }: PageProps) {
                   item.description
                     ? item.description.slice(0, 90)
                     : "No subject stored"
-                }`,
-                value: formatDate(item.createdAt),
+                } · ${formatDate(item.createdAt)}`,
+                value: renderLetterStatus(item.status),
               }))}
             />
+
+            {session.role === "admin" ? (
+              <form action={approveLetterAction} className="approval-row">
+                <label>
+                  <span className="field-label">Pending letter</span>
+                  <select
+                    className="input"
+                    name="letter_id"
+                    defaultValue={String(selectedPendingLetterId)}
+                    required
+                  >
+                    <option value="" disabled>
+                      Select a pending letter
+                    </option>
+                    {pendingLetters.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {(item.referenceNumber ?? item.id) +
+                          " - " +
+                          item.name +
+                          " - " +
+                          formatDate(item.createdAt)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="button-row">
+                  <Button type="submit" variant="secondary">
+                    Approve letter
+                  </Button>
+                </div>
+              </form>
+            ) : null}
           </section>
 
           <section className="section-card form-card">
             <div className="section-head">
               <div>
-                <span className="eyebrow">Incoming correspondence</span>
+                <span className="eyebrow">Incoming letters</span>
                 <h2 className="section-title">Record incoming letters</h2>
               </div>
             </div>
             <div className="space-y-6">
-              <div className="overflow-hidden rounded-3xl border border-border bg-white">
+              <div className="overflow-hidden rounded-3xl border border-border bg-card/95">
                 <form action={createIncomingLetterAction} className="space-y-0">
-                  <div className="border-b border-border/70 px-5 py-4">
-                    <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  <div className="border-b border-border/85 px-5 py-4">
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                       Incoming letter details
                     </h3>
                   </div>
                   <div className="space-y-0 p-5">
+                    <RecordFieldRow
+                      label="Reference number"
+                      helper="Enter the sender's incoming letter reference number."
+                    >
+                      <Input
+                        name="reference_number"
+                        placeholder="e.g. REF/2026/014"
+                        required
+                      />
+                    </RecordFieldRow>
                     <RecordFieldRow label="Sender name">
                       <Input
                         name="sender_name"
@@ -387,7 +498,7 @@ export default async function LettersPage({ searchParams }: PageProps) {
                     </RecordFieldRow>
                   </div>
 
-                  <div className="flex justify-end gap-3 border-t border-border/70 px-5 py-4">
+                  <div className="flex justify-end gap-3 border-t border-border/85 px-5 py-4">
                     <Button type="submit" className="button-primary">
                       Record incoming letter
                     </Button>
@@ -405,17 +516,13 @@ export default async function LettersPage({ searchParams }: PageProps) {
                 searchParamKey="incoming_q"
                 defaultSearchQuery={resolvedSearchParams.incoming_q ?? ""}
                 searchPlaceholder="Search sender, subject, or reference"
-                downloadOptions={
-                  session.role === "admin"
-                    ? [
-                        {
-                          label: "Download incoming letters report",
-                          href: "/api/export/report/incoming-letters",
-                        },
-                      ]
-                    : undefined
-                }
-                className="flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-white p-4"
+                downloadOptions={[
+                  {
+                    label: "Download incoming letters report",
+                    href: "/api/export/report/incoming-letters",
+                  },
+                ]}
+                className="flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-card/95 p-4"
               />
 
               <RecentRecords

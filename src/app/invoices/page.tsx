@@ -67,6 +67,10 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
     redirect("/invoices?error=Invoice%20not%20found.");
   }
 
+  if (isEditing && editDocument?.invoice.sentAt) {
+    redirect("/invoices?error=Sent%20invoices%20cannot%20be%20edited.");
+  }
+
   const nextInvoiceNumber = isEditing
     ? (editDocument?.invoice.invoiceNumber ?? "")
     : await getNextInvoiceNumber();
@@ -199,9 +203,9 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
                 />
               </label>
 
-              <div className="lg:col-span-2 overflow-hidden rounded-3xl border border-border bg-white">
-                <div className="border-b border-border/70 px-5 py-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <div className="lg:col-span-2 overflow-hidden rounded-3xl border border-border bg-card/95">
+                <div className="border-b border-border/85 px-5 py-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                     Payment information
                   </h3>
                 </div>
@@ -240,7 +244,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
 
               <div className="button-row lg:col-span-2">
                 <Button type="submit">
-                  {isEditing ? "Update invoice" : "Save invoice"}
+                  {isEditing ? "Update invoice" : "Create invoice"}
                 </Button>
               </div>
             </form>
@@ -260,17 +264,13 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
               date={resolvedSearchParams.date ?? ""}
               month={resolvedSearchParams.month ?? ""}
               week={resolvedSearchParams.week ?? ""}
-              downloadOptions={
-                session.role === "admin"
-                  ? [
-                      {
-                        label: "Download invoices report",
-                        href: "/api/export/report/invoices",
-                      },
-                    ]
-                  : undefined
-              }
-              className="mb-4 flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-white p-4"
+              downloadOptions={[
+                {
+                  label: "Download invoices report",
+                  href: "/api/export/report/invoices",
+                },
+              ]}
+              className="mb-4 flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-card/95 p-4"
             />
 
             <RecentRecords
@@ -282,6 +282,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
                 value: "Amount",
               }}
               getShareDocument={(item) => {
+                const source = invoices.find((record) => record.id === item.id);
                 const summary =
                   invoiceSummaries.get(item.id) ?? `Invoice ${item.title}`;
 
@@ -289,14 +290,22 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
                   type: "invoice",
                   title: `Invoice ${item.title}`,
                   summary,
+                  recipientPhone: source?.phone ?? null,
                 };
               }}
-              getEditHref={(item) => `/invoices?edit=${item.id}`}
+              getEditHref={(item) => {
+                const source = invoices.find((record) => record.id === item.id);
+                if (!source || source.sentAt) {
+                  return null;
+                }
+
+                return `/invoices?edit=${item.id}`;
+              }}
               getDownloadHref={(item) => `/api/export/invoice/${item.id}`}
               items={invoices.map((item) => ({
                 id: item.id,
                 title: item.invoiceNumber,
-                subtitle: `${item.customerName} · ${formatDate(item.invoiceDate)}`,
+                subtitle: `${item.customerName} · ${formatDate(item.invoiceDate)}${item.sentAt ? " · sent" : ""}`,
                 value: formatTZS(Number(item.grandTotal ?? 0)),
               }))}
             />

@@ -81,6 +81,13 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                   <option value="admin">Admin</option>
                 </Select>
               </label>
+              <label className="space-y-2 lg:col-span-2">
+                <span className="field-label">Signature image path (optional)</span>
+                <Input
+                  name="signature_image_path"
+                  placeholder="/uploads/signatures/admin-signature.png"
+                />
+              </label>
               <div className="button-row lg:col-span-2">
                 <Button type="submit">Add user</Button>
               </div>
@@ -98,14 +105,17 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
             <div className="record-table-wrapper">
               <table className="record-table">
                 <thead>
-                  <tr className="border-b border-border/70">
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  <tr className="border-b border-border/85">
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                       Username
                     </th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                       Role
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                      Signature path
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                       Created
                     </th>
                   </tr>
@@ -114,23 +124,29 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                   {users.map((user) => (
                     <tr
                       key={user.id}
-                      className="border-b border-border/60 last:border-b-0 hover:bg-slate-50/80"
+                      className="border-b border-border/75 last:border-b-0 hover:bg-white/10"
                     >
                       <td
                         data-label="Username"
-                        className="px-4 py-4 align-top text-sm font-semibold text-slate-950"
+                        className="px-4 py-4 align-top text-sm font-semibold text-foreground"
                       >
                         {user.username}
                       </td>
                       <td
                         data-label="Role"
-                        className="px-4 py-4 align-top text-sm text-slate-700"
+                        className="px-4 py-4 align-top text-sm text-foreground/85"
                       >
                         {user.role}
                       </td>
                       <td
+                        data-label="Signature path"
+                        className="px-4 py-4 align-top text-sm text-foreground/85"
+                      >
+                        {user.signatureImagePath || "-"}
+                      </td>
+                      <td
                         data-label="Created"
-                        className="px-4 py-4 align-top text-right text-sm text-slate-700"
+                        className="px-4 py-4 align-top text-right text-sm text-foreground/85"
                       >
                         {formatDate(user.createdAt)}
                       </td>
@@ -139,8 +155,8 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                   {!users.length ? (
                     <tr>
                       <td
-                        className="px-4 py-8 text-sm text-slate-500"
-                        colSpan={3}
+                        className="px-4 py-8 text-sm text-muted-foreground"
+                        colSpan={4}
                       >
                         No users found.
                       </td>

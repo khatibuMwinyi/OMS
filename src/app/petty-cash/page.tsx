@@ -120,7 +120,7 @@ export default async function PettyCashPage({ searchParams }: PageProps) {
                 <Input name="reference_number" />
               </label>
               <div className="button-row lg:col-span-2">
-                <Button type="submit">Save petty cash voucher</Button>
+                <Button type="submit">Create petty cash voucher</Button>
               </div>
             </form>
           </section>
@@ -139,17 +139,13 @@ export default async function PettyCashPage({ searchParams }: PageProps) {
               date={resolvedSearchParams.date ?? ""}
               month={resolvedSearchParams.month ?? ""}
               week={resolvedSearchParams.week ?? ""}
-              downloadOptions={
-                session.role === "admin"
-                  ? [
-                      {
-                        label: "Download petty cash report",
-                        href: "/api/export/report/petty-cash",
-                      },
-                    ]
-                  : undefined
-              }
-              className="mb-4 flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-white p-4"
+              downloadOptions={[
+                {
+                  label: "Download petty cash report",
+                  href: "/api/export/report/petty-cash",
+                },
+              ]}
+              className="mb-4 flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-card/95 p-4"
             />
 
             <RecentRecords
