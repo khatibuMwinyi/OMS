@@ -19,6 +19,7 @@ type LegacySelectionFieldsProps = {
   defaultCategory?: string;
   defaultCode?: string;
   defaultDescription?: string;
+  defaultAmount?: number | string | null;
   showAmount?: boolean;
 };
 
@@ -28,9 +29,13 @@ export function LegacySelectionFields({
   defaultCategory,
   defaultCode,
   defaultDescription,
+  defaultAmount,
   showAmount = true,
 }: LegacySelectionFieldsProps) {
   const initialSelection = useMemo(() => {
+    const hasValue = (field: keyof LegacySelectionRecord, value?: string) =>
+      Boolean(value) && records.some((record) => record[field] === value);
+
     const directMatch =
       (defaultCode && findLegacyRecordByField(records, "code", defaultCode)) ||
       (defaultDescription &&
@@ -39,15 +44,29 @@ export function LegacySelectionFields({
         findLegacyRecordByField(records, "category", defaultCategory)) ||
       null;
 
+    const validDefaultType = hasValue("type", defaultType)
+      ? defaultType
+      : undefined;
+    const validDefaultCategory = hasValue("category", defaultCategory)
+      ? defaultCategory
+      : undefined;
+    const validDefaultCode = hasValue("code", defaultCode)
+      ? defaultCode
+      : undefined;
+    const validDefaultDescription = hasValue("description", defaultDescription)
+      ? defaultDescription
+      : undefined;
+
     return {
       type:
-        defaultType ??
+        validDefaultType ??
         directMatch?.type ??
         getLegacyTypeOptions(records)[0] ??
         "",
-      category: defaultCategory ?? directMatch?.category ?? "",
-      code: defaultCode ?? directMatch?.code ?? "",
-      description: defaultDescription ?? directMatch?.description ?? "",
+      category: validDefaultCategory ?? directMatch?.category ?? "",
+      code: validDefaultCode ?? directMatch?.code ?? "",
+      description:
+        validDefaultDescription ?? directMatch?.description ?? "",
     };
   }, [defaultCategory, defaultCode, defaultDescription, defaultType, records]);
 
@@ -191,7 +210,17 @@ export function LegacySelectionFields({
       {showAmount ? (
         <label className="space-y-2 lg:col-span-2">
           <span className="field-label">Amount</span>
-          <Input name="amount" type="number" step="0.01" required />
+          <Input
+            name="amount"
+            type="number"
+            step="0.01"
+            defaultValue={
+              defaultAmount === null || defaultAmount === undefined
+                ? ""
+                : String(defaultAmount)
+            }
+            required
+          />
         </label>
       ) : null}
     </>

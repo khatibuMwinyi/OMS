@@ -97,9 +97,9 @@ export function ReceiptForm({
         <input name="receipt_id" type="hidden" value={document.id} readOnly />
       ) : null}
       <div className="space-y-6">
-        <div className="overflow-hidden rounded-3xl border border-border bg-white">
-          <div className="border-b border-border/70 px-5 py-4">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+        <div className="overflow-hidden rounded-3xl border border-border bg-card/95">
+          <div className="border-b border-border/85 px-5 py-4">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               Receipt identity
             </h3>
           </div>
@@ -140,9 +140,9 @@ export function ReceiptForm({
           </RecordFieldRow>
         </div>
 
-        <div className="overflow-hidden rounded-3xl border border-border bg-white">
-          <div className="border-b border-border/70 px-5 py-4">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+        <div className="overflow-hidden rounded-3xl border border-border bg-card/95">
+          <div className="border-b border-border/85 px-5 py-4">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               Receipt details
             </h3>
           </div>
@@ -163,9 +163,9 @@ export function ReceiptForm({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-3xl border border-border bg-white">
-          <div className="border-b border-border/70 px-5 py-4">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+        <div className="overflow-hidden rounded-3xl border border-border bg-card/95">
+          <div className="border-b border-border/85 px-5 py-4">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               Payment information
             </h3>
           </div>
@@ -180,10 +180,12 @@ export function ReceiptForm({
         <div className="button-row">
           <Button type="submit" disabled={isPending}>
             {isPending
-              ? "Saving..."
+              ? isEditing
+                ? "Updating..."
+                : "Creating..."
               : isEditing
                 ? "Update receipt"
-                : "Save receipt"}
+                : "Create receipt"}
           </Button>
         </div>
       </div>

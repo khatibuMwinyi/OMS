@@ -4,8 +4,6 @@ import { useState } from "react";
 
 import { RecordFieldRow } from "@/components/record-field-row";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { tanzanianBankOptions } from "@/lib/bank-options";
 import {
   FIXED_BANK_ACCOUNT_NAME,
   FIXED_BANK_ACCOUNT_NUMBER,
@@ -27,12 +25,12 @@ type InvoicePaymentFieldsProps = {
 
 export function InvoicePaymentFields({
   defaultPaymentMethod,
-  defaultBankName,
-  defaultBankAccount,
-  defaultHolderName,
-  defaultMobileNumber,
-  defaultMobileHolder,
-  defaultMobileOperator,
+  defaultBankName: _defaultBankName,
+  defaultBankAccount: _defaultBankAccount,
+  defaultHolderName: _defaultHolderName,
+  defaultMobileNumber: _defaultMobileNumber,
+  defaultMobileHolder: _defaultMobileHolder,
+  defaultMobileOperator: _defaultMobileOperator,
 }: InvoicePaymentFieldsProps) {
   const [paymentMethod, setPaymentMethod] = useState(
     defaultPaymentMethod === "Bank Transfer"
@@ -48,7 +46,7 @@ export function InvoicePaymentFields({
         <div className="flex flex-wrap gap-4 pt-1">
           {["Cash", "Bank Transfer", "Mobile Money"].map((method) => (
             <label
-              className="flex items-center gap-2 text-sm text-slate-700"
+              className="flex items-center gap-2 text-sm text-foreground/85"
               key={method}
             >
               <input
@@ -68,13 +66,12 @@ export function InvoicePaymentFields({
       {paymentMethod === "Bank Transfer" ? (
         <div className="grid gap-4 lg:grid-cols-2">
           <RecordFieldRow label="Bank name">
-            <Select name="bank_name" defaultValue={FIXED_BANK_NAME} required>
-              {tanzanianBankOptions.map((bank) => (
-                <option key={bank} value={bank}>
-                  {bank}
-                </option>
-              ))}
-            </Select>
+            <Input
+              name="bank_name"
+              defaultValue={FIXED_BANK_NAME}
+              readOnly
+              required
+            />
           </RecordFieldRow>
           <RecordFieldRow label="Account number">
             <Input

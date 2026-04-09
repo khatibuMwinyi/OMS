@@ -9,24 +9,53 @@ import {
   legacyVoucherRecords,
   type LegacySelectionRecord,
 } from "@/lib/legacy-form-data";
-import {
-  FIXED_BANK_ACCOUNT_NAME,
-  FIXED_BANK_ACCOUNT_NUMBER,
-  FIXED_BANK_NAME,
-  FIXED_MOBILE_HOLDER_NAME,
-  FIXED_MOBILE_NUMBER,
-} from "@/lib/payment-defaults";
 
 type VoucherFormFieldsProps = {
   voucherNumber: string;
   templates?: LegacySelectionRecord[];
+  defaultDate?: string | null;
+  defaultCustomerName?: string | null;
+  defaultPaymentMethod?: string | null;
+  defaultBankName?: string | null;
+  defaultAccountNumber?: string | null;
+  defaultAccountName?: string | null;
+  defaultBankReference?: string | null;
+  defaultMobileNumber?: string | null;
+  defaultPayerName?: string | null;
+  defaultMobileReference?: string | null;
+  defaultType?: string | null;
+  defaultCategory?: string | null;
+  defaultCode?: string | null;
+  defaultDescription?: string | null;
+  defaultAmount?: number | null;
 };
 
 export function VoucherFormFields({
   templates,
   voucherNumber,
+  defaultDate,
+  defaultCustomerName,
+  defaultPaymentMethod,
+  defaultBankName,
+  defaultAccountNumber,
+  defaultAccountName,
+  defaultBankReference,
+  defaultMobileNumber,
+  defaultPayerName,
+  defaultMobileReference,
+  defaultType,
+  defaultCategory,
+  defaultCode,
+  defaultDescription,
+  defaultAmount,
 }: VoucherFormFieldsProps) {
-  const [paymentMethod, setPaymentMethod] = useState("Cash");
+  const [paymentMethod, setPaymentMethod] = useState(
+    defaultPaymentMethod === "Bank Transfer" ||
+      defaultPaymentMethod === "Mobile Transaction" ||
+      defaultPaymentMethod === "Cash"
+      ? defaultPaymentMethod
+      : "Cash",
+  );
   const mergedRecords = [...legacyVoucherRecords, ...(templates ?? [])].filter(
     (record, index, allRecords) =>
       index ===
@@ -52,11 +81,11 @@ export function VoucherFormFields({
       </label>
       <label className="space-y-2">
         <span className="field-label">Date</span>
-        <Input name="date" type="date" required />
+        <Input name="date" type="date" defaultValue={defaultDate ?? ""} required />
       </label>
       <label className="space-y-2">
         <span className="field-label">Customer name</span>
-        <Input name="customer_name" required />
+        <Input name="customer_name" defaultValue={defaultCustomerName ?? ""} required />
       </label>
 
       <fieldset className="space-y-3 lg:col-span-2">
@@ -64,7 +93,7 @@ export function VoucherFormFields({
         <div className="flex flex-wrap gap-4">
           {["Cash", "Bank Transfer", "Mobile Transaction"].map((method) => (
             <label
-              className="flex items-center gap-2 text-sm text-slate-700"
+              className="flex items-center gap-2 text-sm text-foreground/85"
               key={method}
             >
               <input
@@ -82,69 +111,84 @@ export function VoucherFormFields({
       </fieldset>
 
       {paymentMethod === "Bank Transfer" ? (
-        <div className="lg:col-span-2 grid gap-3 rounded-3xl border border-border bg-slate-50 p-4 sm:grid-cols-2">
+        <div className="lg:col-span-2 grid gap-3 rounded-3xl border border-border bg-white/5 p-4 sm:grid-cols-2">
           <label className="space-y-2">
-            <span className="field-label">Bank name</span>
+            <span className="field-label">Beneficiary bank name</span>
             <Input
               name="bank_name"
-              defaultValue={FIXED_BANK_NAME}
-              readOnly
+              defaultValue={defaultBankName ?? ""}
+              placeholder="e.g. NMB"
               required
             />
           </label>
           <label className="space-y-2">
-            <span className="field-label">Account number</span>
+            <span className="field-label">Beneficiary account number</span>
             <Input
               name="account_number"
-              defaultValue={FIXED_BANK_ACCOUNT_NUMBER}
-              readOnly
+              defaultValue={defaultAccountNumber ?? ""}
+              placeholder="e.g. 0123456789"
               required
             />
           </label>
           <label className="space-y-2">
-            <span className="field-label">Account name</span>
+            <span className="field-label">Beneficiary account name</span>
             <Input
               name="account_name"
-              defaultValue={FIXED_BANK_ACCOUNT_NAME}
-              readOnly
+              defaultValue={defaultAccountName ?? ""}
+              placeholder="e.g. John Doe"
               required
             />
           </label>
           <label className="space-y-2">
             <span className="field-label">Reference number</span>
-            <Input name="bank_reference" required />
+            <Input
+              name="bank_reference"
+              defaultValue={defaultBankReference ?? ""}
+              required
+            />
           </label>
         </div>
       ) : null}
 
       {paymentMethod === "Mobile Transaction" ? (
-        <div className="lg:col-span-2 grid gap-3 rounded-3xl border border-border bg-slate-50 p-4 sm:grid-cols-2">
+        <div className="lg:col-span-2 grid gap-3 rounded-3xl border border-border bg-white/5 p-4 sm:grid-cols-2">
           <label className="space-y-2">
-            <span className="field-label">Mobile number</span>
+            <span className="field-label">Beneficiary mobile number</span>
             <Input
               name="mobile_number"
-              defaultValue={FIXED_MOBILE_NUMBER}
-              readOnly
+              defaultValue={defaultMobileNumber ?? ""}
+              placeholder="e.g. 07XXXXXXXX"
               required
             />
           </label>
           <label className="space-y-2">
-            <span className="field-label">Payer name</span>
+            <span className="field-label">Beneficiary name</span>
             <Input
               name="payer_name"
-              defaultValue={FIXED_MOBILE_HOLDER_NAME}
-              readOnly
+              defaultValue={defaultPayerName ?? ""}
+              placeholder="e.g. Jane Doe"
               required
             />
           </label>
           <label className="space-y-2 lg:col-span-2">
             <span className="field-label">Reference number</span>
-            <Input name="mobile_reference" required />
+            <Input
+              name="mobile_reference"
+              defaultValue={defaultMobileReference ?? ""}
+              required
+            />
           </label>
         </div>
       ) : null}
 
-      <LegacySelectionFields records={mergedRecords} defaultType="Expense" />
+      <LegacySelectionFields
+        records={mergedRecords}
+        defaultType={defaultType ?? "Expense"}
+        defaultCategory={defaultCategory ?? undefined}
+        defaultCode={defaultCode ?? undefined}
+        defaultDescription={defaultDescription ?? undefined}
+        defaultAmount={defaultAmount ?? undefined}
+      />
     </>
   );
 }

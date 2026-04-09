@@ -94,10 +94,10 @@ export function InvoiceItemsField({ initialRows }: InvoiceItemsFieldProps) {
   };
 
   return (
-    <div className="rounded-2xl border border-border bg-slate-50 p-4">
+    <div className="rounded-2xl border border-border bg-white/5 p-4">
       <input name="items" type="hidden" value={serializedItems} readOnly />
 
-      <div className="flex flex-col gap-3 border-b border-border/70 pb-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 border-b border-border/85 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <span className="field-label mb-1">Invoice items</span>
           <p className="helper-text mt-0">
@@ -114,20 +114,20 @@ export function InvoiceItemsField({ initialRows }: InvoiceItemsFieldProps) {
       <div className="mt-4 record-table-wrapper">
         <table className="record-table record-table--editor">
           <thead>
-            <tr className="border-b border-border/70">
-              <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <tr className="border-b border-border/85">
+              <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Description
               </th>
-              <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Qty
               </th>
-              <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <th className="px-3 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Unit price
               </th>
-              <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Line total
               </th>
-              <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Action
               </th>
             </tr>
@@ -139,7 +139,7 @@ export function InvoiceItemsField({ initialRows }: InvoiceItemsFieldProps) {
               const lineTotal = quantity * unitPrice;
 
               return (
-                <tr key={row.id} className="border-b border-border/60 last:border-b-0">
+                <tr key={row.id} className="border-b border-border/75 last:border-b-0">
                   <td data-label="Description" className="px-3 py-3 align-top">
                     <Input
                       value={row.description}
@@ -168,7 +168,7 @@ export function InvoiceItemsField({ initialRows }: InvoiceItemsFieldProps) {
                       required
                     />
                   </td>
-                  <td data-label="Line total" className="px-3 py-3 align-top text-right text-sm font-semibold text-slate-900">
+                  <td data-label="Line total" className="px-3 py-3 align-top text-right text-sm font-semibold text-foreground">
                     {formatTZS(lineTotal)}
                   </td>
                   <td data-label="Action" className="px-3 py-3 align-top text-right">
@@ -190,11 +190,11 @@ export function InvoiceItemsField({ initialRows }: InvoiceItemsFieldProps) {
         </table>
       </div>
 
-      <div className="mt-4 flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-slate-500">
+      <div className="mt-4 flex flex-col gap-3 border-t border-border/85 pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">
           Totals are calculated from the entered rows and saved in the existing invoice item format.
         </p>
-        <div className="flex flex-wrap gap-4 text-sm font-semibold text-slate-900">
+        <div className="flex flex-wrap gap-4 text-sm font-semibold text-foreground">
           <span>Subtotal: {formatTZS(subtotal)}</span>
         </div>
       </div>

@@ -26,7 +26,7 @@ export function ReceiptPaymentFields({
       <RecordFieldRow label="Payment method">
         <div className="flex flex-wrap gap-4 pt-1">
           {["Cash", "Bank Transfer"].map((method) => (
-            <label className="flex items-center gap-2 text-sm text-slate-700" key={method}>
+            <label className="flex items-center gap-2 text-sm text-foreground/85" key={method}>
               <input
                 checked={paymentMethod === method}
                 className="h-4 w-4 border-slate-300 text-primary focus:ring-primary"
@@ -46,7 +46,7 @@ export function ReceiptPaymentFields({
           <RecordFieldRow label="Bank name">
             <Input
               name="bank_name"
-              defaultValue={FIXED_BANK_NAME}
+              defaultValue={defaultBankName ?? FIXED_BANK_NAME}
               readOnly
               required
             />
