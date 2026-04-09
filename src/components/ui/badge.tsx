@@ -9,13 +9,13 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "border-transparent bg-primary/10 text-primary",
+          "border-primary/25 bg-primary/15 text-primary",
         secondary:
-          "border-transparent bg-slate-100 text-slate-700",
-        outline: "border-border bg-background text-slate-700",
-        success: "border-emerald-200 bg-emerald-50 text-emerald-700",
-        warning: "border-amber-200 bg-amber-50 text-amber-700",
-        destructive: "border-red-200 bg-red-50 text-red-700",
+          "border-border bg-white/5 text-foreground/85",
+        outline: "border-border bg-background text-foreground/85",
+        success: "border-emerald-300/30 bg-emerald-400/15 text-emerald-200",
+        warning: "border-amber-300/30 bg-amber-300/15 text-amber-200",
+        destructive: "border-red-300/30 bg-red-300/15 text-red-200",
       },
     },
     defaultVariants: {

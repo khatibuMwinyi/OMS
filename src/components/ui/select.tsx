@@ -10,7 +10,7 @@ const Select = React.forwardRef<
     <div className="relative">
       <select
         className={cn(
-          "flex h-11 w-full appearance-none rounded-xl border border-[#EFBF04] bg-[#76B3F4] px-4 py-2.5 text-sm text-foreground shadow-sm transition focus:border-[#EFBF04] focus:outline-none focus:ring-4 focus:ring-[#EFBF04]/25 disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-11 w-full appearance-none rounded-xl border border-primary/25 bg-card/75 px-4 py-2.5 text-sm text-foreground shadow-sm transition focus:border-primary/60 focus:outline-none focus:ring-4 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50",
           className,
         )}
         ref={ref}
@@ -18,7 +18,7 @@ const Select = React.forwardRef<
       >
         {children}
       </select>
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
+      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground">
         <svg
           className="h-4 w-4"
           fill="none"
