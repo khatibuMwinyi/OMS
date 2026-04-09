@@ -30,7 +30,7 @@ export function CollapsibleSection({
     <section className="space-y-4">
       <button
         onClick={handleToggle}
-        className="w-full flex items-center justify-between gap-3 rounded-xl border border-border bg-white px-5 py-4 transition hover:bg-slate-50/50"
+        className="w-full flex items-center justify-between gap-3 rounded-xl border border-border bg-card/95 px-5 py-4 transition hover:bg-white/10"
       >
         <div className="text-left">
           {eyebrow && <span className="eyebrow block">{eyebrow}</span>}
@@ -38,7 +38,7 @@ export function CollapsibleSection({
         </div>
         <ChevronDown
           size={20}
-          className={`text-slate-600 transition-transform duration-200 flex-shrink-0 ${
+          className={`text-foreground/75 transition-transform duration-200 flex-shrink-0 ${
             isOpen ? "rotate-180" : ""
           }`}
         />

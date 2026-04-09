@@ -176,7 +176,7 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
               variant="outline"
               size="sm"
               type="submit"
-              className="w-full text-white hover:text-white"
+              className="w-full text-primary hover:text-primary"
             >
               Logout
             </Button>
@@ -213,7 +213,7 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
               variant="outline"
               size="sm"
               type="submit"
-              className="w-full text-white hover:text-white"
+              className="w-full text-primary hover:text-primary"
             >
               Logout
             </Button>

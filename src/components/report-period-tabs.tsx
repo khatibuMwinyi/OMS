@@ -225,7 +225,7 @@ export function ReportPeriodTabs({
     <div
       className={
         className ??
-        "flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-white p-4"
+        "flex flex-wrap items-end gap-3 rounded-3xl border border-border bg-card/95 p-4"
       }
     >
       <label className="space-y-2">
@@ -308,7 +308,7 @@ export function ReportPeriodTabs({
           </label>
 
           {selectedRangeLabel ? (
-            <p className="min-w-full text-xs text-slate-500">
+            <p className="min-w-full text-xs text-muted-foreground">
               {selectedRangeLabel}
             </p>
           ) : null}

@@ -18,7 +18,7 @@ export function RecordFieldRow({
   return (
     <div
       className={cn(
-        "grid gap-4 border-b border-border/70 px-5 py-4 last:border-b-0 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start",
+        "grid gap-4 border-b border-border/85 px-5 py-4 last:border-b-0 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start",
         className,
       )}
     >
