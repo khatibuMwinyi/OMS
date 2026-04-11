@@ -12,7 +12,6 @@ import {
 import { AppHeader } from "@/components/app-header";
 import { RecentRecords } from "@/components/recent-records";
 import { StatCard } from "@/components/stat-card";
-import { Badge } from "@/components/ui/badge";
 import { getDashboardOverview } from "@/lib/dashboard";
 import { getCurrentSession } from "@/lib/session-server";
 
@@ -28,54 +27,8 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function renderVoucherStatus(status: string) {
-  const normalizedStatus = status.toLowerCase();
-
-  if (normalizedStatus === "approved") {
-    return (
-      <Badge variant="success" className="px-2 py-0.5 text-[10px]">
-        Approved
-      </Badge>
-    );
-  }
-
-  if (normalizedStatus === "pending") {
-    return (
-      <Badge variant="warning" className="px-2 py-0.5 text-[10px]">
-        Pending
-      </Badge>
-    );
-  }
-
-  if (normalizedStatus === "rejected") {
-    return (
-      <Badge variant="destructive" className="px-2 py-0.5 text-[10px]">
-        Rejected
-      </Badge>
-    );
-  }
-
-  return (
-    <Badge variant="secondary" className="px-2 py-0.5 text-[10px]">
-      {status}
-    </Badge>
-  );
-}
-
-function renderLetterStatus(status: "pending" | "approved") {
-  if (status === "approved") {
-    return (
-      <Badge variant="success" className="px-2 py-0.5 text-[10px]">
-        Approved
-      </Badge>
-    );
-  }
-
-  return (
-    <Badge variant="warning" className="px-2 py-0.5 text-[10px]">
-      Pending Approval
-    </Badge>
-  );
+function formatLetterStatus(status: "pending" | "approved") {
+  return status === "approved" ? "Approved" : "Pending Approval";
 }
 
 const summaryIcons = {
@@ -167,9 +120,6 @@ export default async function DashboardPage() {
                   value: "Amount",
                 }}
                 getShareDocument={(item) => {
-                  const source = overview.recentInvoices.find(
-                    (record) => record.id === item.id,
-                  );
                   const summary =
                     invoiceSummaries.get(item.id) ?? `Invoice ${item.title}`;
 
@@ -177,7 +127,6 @@ export default async function DashboardPage() {
                     type: "invoice",
                     title: `Invoice ${item.title}`,
                     summary,
-                    recipientPhone: source?.phone ?? null,
                   };
                 }}
                 getEditHref={(item) => {
@@ -208,9 +157,6 @@ export default async function DashboardPage() {
                   value: "Amount",
                 }}
                 getShareDocument={(item) => {
-                  const source = overview.recentReceipts.find(
-                    (record) => record.id === item.id,
-                  );
                   const summary =
                     receiptSummaries.get(item.id) ?? `Receipt ${item.title}`;
 
@@ -218,7 +164,6 @@ export default async function DashboardPage() {
                     type: "receipt",
                     title: `Receipt ${item.title}`,
                     summary,
-                    recipientPhone: source?.phone ?? null,
                   };
                 }}
                 getEditHref={(item) => {
@@ -265,35 +210,11 @@ export default async function DashboardPage() {
                   details: "Status",
                   value: "Amount",
                 }}
-                getEditHref={(item) => {
-                  const source = overview.recentVouchers.find(
-                    (record) => record.id === item.id,
-                  );
-                  if (!source || source.status === "approved") {
-                    return null;
-                  }
-
-                  if (session.role === "admin") {
-                    return `/payment-vouchers?edit=${item.id}`;
-                  }
-
-                  return source.status === "rejected"
-                    ? `/payment-vouchers?edit=${item.id}`
-                    : null;
-                }}
                 getDownloadHref={(item) => `/api/export/payment-voucher/${item.id}`}
                 items={overview.recentVouchers.map((item) => ({
                   id: item.id,
                   title: item.voucherNumber,
-                  subtitle: (
-                    <span className="inline-flex flex-wrap items-center gap-2">
-                      <span>{item.category}</span>
-                      <span aria-hidden="true">&middot;</span>
-                      {renderVoucherStatus(item.status)}
-                      <span aria-hidden="true">&middot;</span>
-                      <span>{formatDate(item.voucherDate)}</span>
-                    </span>
-                  ),
+                  subtitle: `${item.category} · ${item.status} · ${formatDate(item.voucherDate)}`,
                   value: formatTZS(Number(item.amount ?? 0)),
                 }))}
               />
@@ -343,7 +264,7 @@ export default async function DashboardPage() {
                   subtitle: item.description
                     ? `${item.description.slice(0, 90)} · ${formatDate(item.createdAt)}`
                     : `No subject stored · ${formatDate(item.createdAt)}`,
-                  value: renderLetterStatus(item.status),
+                  value: formatLetterStatus(item.status),
                 }))}
               />
             </div>
