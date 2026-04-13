@@ -143,7 +143,7 @@ export async function buildPettyCashPdf(document: PettyCashRecord) {
   });
 
   // Top Right Info
-  page.drawText(`#PCV${document.pettycashNumber || document.id}`, {
+  page.drawText(`#${document.pettycashNumber || document.id}`, {
     x: rightLabelX,
     y: pageHeight - 104,
     size: 20,

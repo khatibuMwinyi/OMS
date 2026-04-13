@@ -4,25 +4,28 @@
 
 @layer base {
   :root {
-    --background: 221 50% 8%;
-    --foreground: 214 39% 95%;
-    --card: 221 34% 16%;
-    --card-foreground: 214 39% 95%;
-    --popover: 221 39% 14%;
-    --popover-foreground: 214 39% 95%;
-    --primary: 40 92% 74%;
-    --primary-foreground: 221 52% 10%;
-    --secondary: 219 30% 25%;
-    --secondary-foreground: 214 39% 95%;
-    --muted: 220 30% 17%;
-    --muted-foreground: 218 19% 68%;
-    --accent: 161 55% 62%;
-    --accent-foreground: 221 52% 10%;
+    --background: 216 26% 16%;
+    --foreground: 214 28% 94%;
+    --card: 215 20% 18%;
+    --card-foreground: 214 30% 96%;
+    --popover: 215 18% 24%;
+    --popover-foreground: 214 35% 96%;
+    --primary: 42 88% 60%;
+    --primary-foreground: 210 14% 12%;
+    --secondary: 216 35% 32%;
+    --secondary-foreground: 214 39% 96%;
+    --muted: 214 18% 60%;
+    --muted-foreground: 214 28% 78%;
+    --accent: 45 94% 62%;
+    --accent-foreground: 210 18% 12%;
+    --surface: 42 14% 90%;
+    --surface-color: #DFE0DC;
+    --surface-foreground: 213 17% 17%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
-    --border: 220 22% 30%;
-    --input: 220 22% 26%;
-    --ring: 40 92% 74%;
+    --border: 214 18% 40%;
+    --input: 214 18% 24%;
+    --ring: 42 88% 60%;
     --font-display: "Futura PT", "Poppins", sans-serif;
   }
 
@@ -37,22 +40,10 @@
   body {
     @apply min-h-screen bg-background font-body text-foreground antialiased;
     background:
-      radial-gradient(
-        circle at 9% 0%,
-        rgba(251, 191, 36, 0.2),
-        transparent 33%
-      ),
-      radial-gradient(
-        circle at 86% 16%,
-        rgba(52, 211, 153, 0.18),
-        transparent 31%
-      ),
-      radial-gradient(
-        circle at 78% 86%,
-        rgba(96, 165, 250, 0.14),
-        transparent 34%
-      ),
-      linear-gradient(180deg, #0a1324 0%, #050b17 100%);
+      radial-gradient(circle at 10% 4%, rgba(245, 186, 70, 0.18), transparent 28%),
+      radial-gradient(circle at 90% 18%, rgba(42, 119, 204, 0.18), transparent 24%),
+      radial-gradient(circle at 70% 92%, rgba(223, 224, 220, 0.14), transparent 22%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background) / 0.88) 100%);
   }
 
   body::before {
@@ -110,8 +101,8 @@
     @apply rounded-3xl border border-border/80 shadow-soft backdrop-blur-xl;
     background: linear-gradient(
       160deg,
-      hsl(var(--card) / 0.96),
-      hsl(var(--background) / 0.9)
+      hsl(var(--card) / 0.94),
+      rgba(223, 224, 220, 0.08)
     );
   }
 
@@ -301,7 +292,8 @@
   }
 
   .button-secondary {
-    @apply border border-border bg-card/75 text-foreground hover:-translate-y-0.5 hover:border-primary/30 hover:bg-primary/10 hover:text-primary focus:ring-primary/15;
+    @apply border border-border bg-white/8 text-foreground hover:-translate-y-0.5 hover:border-primary/30 hover:text-primary focus:ring-primary/15;
+    background-image: linear-gradient(180deg, rgba(223, 224, 220, 0.08), rgba(223, 224, 220, 0.03));
   }
 
   .button-ghost {
@@ -398,26 +390,42 @@
   }
 
   .summary-grid {
-    @apply mt-4 grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 xl:gap-5;
+    @apply mt-4 gap-3;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    max-width: 980px;
+    margin-inline: auto;
   }
 
   .stat-card {
-    @apply relative min-h-[95px] overflow-hidden p-3 sm:min-h-[110px] sm:p-5;
+    @apply relative overflow-hidden p-3;
+    min-height: 64px;
   }
 
   .stat-label {
-    @apply text-xs sm:text-sm font-medium text-muted-foreground;
+    @apply text-[0.68rem] sm:text-[0.75rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground;
   }
 
   .stat-value {
     font-family: var(--font-display);
-    font-size: clamp(1.25rem, 3vw, 2.15rem);
-    line-height: 1;
-    @apply mt-2 sm:mt-3 tracking-[-0.04em] text-primary;
+    font-size: clamp(1rem, 2.5vw, 1.4rem);
+    line-height: 1.05;
+    @apply mt-1 sm:mt-1 tracking-[-0.04em] text-primary;
   }
 
   .stat-detail {
-    @apply mt-1 text-xs sm:text-sm;
+    @apply mt-1 text-[0.72rem] text-muted-foreground leading-5;
+  }
+
+  @media (max-width: 640px) {
+    .stat-card {
+      min-height: 58px;
+      padding: 0.75rem;
+    }
+
+    .stat-value {
+      font-size: 1.1rem;
+    }
   }
 
   /* Mobile-first responsive grid: single column on mobile, full-width 12-col on xl: breakpoint */
@@ -578,20 +586,44 @@
   }
 
   .record-table-wrapper {
-    @apply overflow-hidden rounded-2xl border border-border bg-card/90;
+    @apply overflow-hidden rounded-2xl border shadow-sm;
+    background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(223,224,220,0.08));
+    border-color: rgba(223,224,220,0.22);
   }
 
   .record-table {
     @apply w-full text-left text-sm;
+    border-collapse: separate;
+    border-spacing: 0 0.25rem;
   }
 
   .record-table th,
   .record-table td {
-    @apply border-b border-border px-4 py-3 align-top;
+    @apply border-b px-4 py-3 align-top;
+    border-color: rgba(223,224,220,0.18);
   }
 
   .record-table th {
-    @apply bg-white/5 font-semibold text-foreground/85;
+    @apply font-semibold;
+    background: rgba(223,224,220,0.2);
+    color: var(--surface-foreground);
+  }
+
+  .record-table tbody tr {
+    background: rgba(255,255,255,0.06);
+    transition: background 0.2s ease;
+  }
+
+  .record-table tbody tr:nth-child(even) {
+    background: rgba(255,255,255,0.09);
+  }
+
+  .record-table tbody tr:hover {
+    background: rgba(255,255,255,0.16);
+  }
+
+  .record-table td {
+    @apply text-foreground/85;
   }
 
   .sidebar-link svg {
@@ -706,11 +738,11 @@
   }
 
   .stat-card {
-    @apply min-h-[95px] p-3;
+    @apply min-h-[80px] p-2;
   }
 
   .stat-label {
-    @apply text-xs;
+    @apply text-[0.72rem];
   }
 
   .list-grid,

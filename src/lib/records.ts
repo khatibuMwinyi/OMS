@@ -462,8 +462,8 @@ async function getLatestPettyCashNumber() {
   const record = await firstOrNull<{ pettyCashNumber: string }>(
     `SELECT pettycash_number AS pettyCashNumber
      FROM petty_cash_transactions
-     WHERE pettycash_number LIKE 'PC%'
-     ORDER BY CAST(SUBSTRING(pettycash_number, 3) AS UNSIGNED) DESC, created_at DESC
+     WHERE pettycash_number LIKE 'PCN%'
+     ORDER BY CAST(SUBSTRING(pettycash_number, 4) AS UNSIGNED) DESC, created_at DESC
      LIMIT 1`,
     [],
   );
@@ -520,13 +520,13 @@ export async function getNextInvoiceNumber() {
 }
 
 export async function getNextVoucherNumber() {
-  return incrementPrefixedSequentialNumber(await getLatestVoucherNumber(), "VN");
+  return incrementPrefixedSequentialNumber(await getLatestVoucherNumber(), "PVN");
 }
 
 export async function getNextPettyCashNumber() {
   return incrementPrefixedSequentialNumber(
     await getLatestPettyCashNumber(),
-    "PC",
+    "PCN",
   );
 }
 

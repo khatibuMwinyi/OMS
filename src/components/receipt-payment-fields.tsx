@@ -47,7 +47,7 @@ export function ReceiptPaymentFields({
             <Input
               name="bank_name"
               defaultValue={defaultBankName ?? FIXED_BANK_NAME}
-              readOnly
+              // Editable input for bank name
               required
             />
           </RecordFieldRow>

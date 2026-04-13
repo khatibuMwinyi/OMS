@@ -25,7 +25,7 @@ export default async function HomePage() {
           />
           <div className="brand-name">
             <strong>OWERU</strong>
-            <span>Management Portal</span>
+            <span>Management System</span>
           </div>
         </div>
 
