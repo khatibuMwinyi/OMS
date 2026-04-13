@@ -29,11 +29,12 @@ export const legacyReceiptRecords: LegacySelectionRecord[] = [
   { type: "Revenue", category: "Oweru Investment", code: "RC-402", description: "FDI Investor Facilitation Fees" },
   { type: "Revenue", category: "Oweru Investment", code: "RC-403", description: "Partnership / Joint Venture Income" },
   { type: "Revenue", category: "Oweru Investment", code: "RC-404", description: "Investor Advisory & Documentation Fees" },
-  { type: "Revenue", category: "Oweru Tech Systems", code: "RC-501", description: "Building Permit System Subscription" },
-  { type: "Revenue", category: "Oweru Tech Systems", code: "RC-502", description: "Plot Verification System Revenue" },
-  { type: "Revenue", category: "Oweru Tech Systems", code: "RC-503", description: "Marketplace Commission Revenue" },
-  { type: "Revenue", category: "Oweru Tech Systems", code: "RC-504", description: "Property Management Software Subscription" },
+  { type: "Revenue", category: "Oweru Tech Systems", code: "RC-501", description: "Renting Commission" },
+  { type: "Revenue", category: "Oweru Tech Systems", code: "RC-502", description: "AirBnB Rent" },
+  { type: "Revenue", category: "Oweru Tech Systems", code: "RC-503", description: "Marketplace Commission" },
+  { type: "Revenue", category: "Oweru Tech Systems", code: "RC-504", description: "Property Management Commission" },
   { type: "Revenue", category: "Oweru Tech Systems", code: "RC-505", description: "Freelance Marketplace Commission" },
+    { type: "Revenue", category: "Oweru Tech Systems", code: "RC-506", description: "Rental Income" }
 ];
 
 export const legacyPettyCashRecords: LegacySelectionRecord[] = [
@@ -150,10 +151,10 @@ export const legacyVoucherRecords: LegacySelectionRecord[] = [
     { type: "Expense", category: "Staff & HR", code: "EC-107", description: "Office Uniforms & PPE" },
     { type: "Expense", category: "Staff & HR", code: "EC-108", description: "Wages (Casual Labour)" },
     { type: "Expense", category: "Staff & HR", code: "EC-109", description: "Travel Allowance / Per Diem" },
-    { type: "Expense", category: "Investment Gateway", code: "EC-501", description: "Investor Facilitation Costs" },
-    { type: "Expense", category: "Investment Gateway", code: "EC-502", description: "Documentation Preparation" },
-    { type: "Expense", category: "Investment Gateway", code: "EC-503", description: "Partnership Meetings" },
-    { type: "Expense", category: "Investment Gateway", code: "EC-504", description: "Visa Processing Fees" },
+    { type: "Expense", category: "Investment", code: "EC-501", description: "Investor Facilitation Costs" },
+    { type: "Expense", category: "Investment", code: "EC-502", description: "Documentation Preparation" },
+    { type: "Expense", category: "Investment", code: "EC-503", description: "Partnership Meetings" },
+    { type: "Expense", category: "Investment", code: "EC-504", description: "Visa Processing Fees" },
     // --- END: Added missing entries from user-provided table ---
 ];
 
