@@ -155,48 +155,35 @@ let printedLettersTableReady: Promise<void> | null = null;
 let incomingLettersTableReady: Promise<void> | null = null;
 let documentWorkflowColumnsReady: Promise<void> | null = null;
 
+async function addColumnIfNotExists(
+  table: string,
+  column: string,
+  definition: string,
+): Promise<void> {
+  const rows = await queryRows<{ Field: string }>(
+    `SELECT COLUMN_NAME AS \`Field\`
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND COLUMN_NAME = ?`,
+    [table, column],
+  ).catch(() => []);
+
+  if (rows.length === 0) {
+    await execute(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`);
+  }
+}
+
 export function ensureDocumentWorkflowColumns() {
   if (!documentWorkflowColumnsReady) {
-    documentWorkflowColumnsReady = execute(`
-      ALTER TABLE users
-      ADD COLUMN IF NOT EXISTS signature_image_path VARCHAR(500) NULL
-    `)
-      .then(() =>
-        execute(`
-          ALTER TABLE invoices
-          ADD COLUMN IF NOT EXISTS sent_at TIMESTAMP NULL
-        `),
-      )
-      .then(() =>
-        execute(`
-          ALTER TABLE invoices
-          ADD COLUMN IF NOT EXISTS sent_by INT NULL
-        `),
-      )
-      .then(() =>
-        execute(`
-          ALTER TABLE invoices
-          ADD COLUMN IF NOT EXISTS sent_via ENUM('whatsapp', 'email') NULL
-        `),
-      )
-      .then(() =>
-        execute(`
-          ALTER TABLE receipts
-          ADD COLUMN IF NOT EXISTS sent_at TIMESTAMP NULL
-        `),
-      )
-      .then(() =>
-        execute(`
-          ALTER TABLE receipts
-          ADD COLUMN IF NOT EXISTS sent_by INT NULL
-        `),
-      )
-      .then(() =>
-        execute(`
-          ALTER TABLE receipts
-          ADD COLUMN IF NOT EXISTS sent_via ENUM('whatsapp', 'email') NULL
-        `),
-      )
+    documentWorkflowColumnsReady = Promise.resolve()
+      .then(() => addColumnIfNotExists("users", "signature_image_path", "VARCHAR(500) NULL"))
+      .then(() => addColumnIfNotExists("invoices", "sent_at", "TIMESTAMP NULL"))
+      .then(() => addColumnIfNotExists("invoices", "sent_by", "INT NULL"))
+      .then(() => addColumnIfNotExists("invoices", "sent_via", "ENUM('whatsapp', 'email') NULL"))
+      .then(() => addColumnIfNotExists("receipts", "sent_at", "TIMESTAMP NULL"))
+      .then(() => addColumnIfNotExists("receipts", "sent_by", "INT NULL"))
+      .then(() => addColumnIfNotExists("receipts", "sent_via", "ENUM('whatsapp', 'email') NULL"))
       .then(() => undefined);
   }
 
@@ -228,54 +215,13 @@ function ensurePrintedLettersTable() {
         FOREIGN KEY (user_id) REFERENCES users(id)
       )
     `)
-      .then(() =>
-        execute(`
-          ALTER TABLE printed_letters
-          ADD COLUMN IF NOT EXISTS reference_number VARCHAR(50) NULL
-        `),
-      )
-      .then(() =>
-        execute(`
-          ALTER TABLE printed_letters
-          ADD COLUMN IF NOT EXISTS status ENUM('pending', 'approved') NOT NULL DEFAULT 'pending'
-        `),
-      )
-      .then(() =>
-        execute(`
-          ALTER TABLE printed_letters
-          ADD COLUMN IF NOT EXISTS approved_by INT NULL
-        `),
-      )
-      .then(() =>
-        execute(`
-          ALTER TABLE printed_letters
-          ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP NULL
-        `),
-      )
-      .then(() =>
-        execute(`
-          ALTER TABLE printed_letters
-          ADD COLUMN IF NOT EXISTS approved_signature_path VARCHAR(500) NULL
-        `),
-      )
-      .then(() =>
-        execute(`
-          ALTER TABLE printed_letters
-          ADD COLUMN IF NOT EXISTS sent_at TIMESTAMP NULL
-        `),
-      )
-      .then(() =>
-        execute(`
-          ALTER TABLE printed_letters
-          ADD COLUMN IF NOT EXISTS sent_by INT NULL
-        `),
-      )
-      .then(() =>
-        execute(`
-          ALTER TABLE printed_letters
-          ADD COLUMN IF NOT EXISTS sent_via ENUM('whatsapp', 'email') NULL
-        `),
-      )
+      .then(() => addColumnIfNotExists("printed_letters", "reference_number", "VARCHAR(50) NULL"))
+      .then(() => addColumnIfNotExists("printed_letters", "approved_by", "INT NULL"))
+      .then(() => addColumnIfNotExists("printed_letters", "approved_at", "TIMESTAMP NULL"))
+      .then(() => addColumnIfNotExists("printed_letters", "approved_signature_path", "VARCHAR(500) NULL"))
+      .then(() => addColumnIfNotExists("printed_letters", "sent_at", "TIMESTAMP NULL"))
+      .then(() => addColumnIfNotExists("printed_letters", "sent_by", "INT NULL"))
+      .then(() => addColumnIfNotExists("printed_letters", "sent_via", "ENUM('whatsapp', 'email') NULL"))
       .then(() => undefined);
   }
 
@@ -307,24 +253,9 @@ function ensureIncomingLettersTable() {
         FOREIGN KEY (user_id) REFERENCES users(id)
       )
     `)
-      .then(() =>
-        execute(`
-          ALTER TABLE incoming_letters
-          ADD COLUMN IF NOT EXISTS pdf_path VARCHAR(500) NOT NULL DEFAULT ''
-        `),
-      )
-      .then(() =>
-        execute(`
-          ALTER TABLE incoming_letters
-          ADD COLUMN IF NOT EXISTS original_file_name VARCHAR(255) NULL
-        `),
-      )
-      .then(() =>
-        execute(`
-          ALTER TABLE incoming_letters
-          ADD COLUMN IF NOT EXISTS reference_number VARCHAR(50) NULL
-        `),
-      )
+      .then(() => addColumnIfNotExists("incoming_letters", "pdf_path", "VARCHAR(500) NOT NULL DEFAULT ''"))
+      .then(() => addColumnIfNotExists("incoming_letters", "original_file_name", "VARCHAR(255) NULL"))
+      .then(() => addColumnIfNotExists("incoming_letters", "reference_number", "VARCHAR(50) NULL"))
       .then(() => undefined);
   }
 
@@ -462,8 +393,8 @@ async function getLatestPettyCashNumber() {
   const record = await firstOrNull<{ pettyCashNumber: string }>(
     `SELECT pettycash_number AS pettyCashNumber
      FROM petty_cash_transactions
-     WHERE pettycash_number LIKE 'PC%'
-     ORDER BY CAST(SUBSTRING(pettycash_number, 3) AS UNSIGNED) DESC, created_at DESC
+     WHERE pettycash_number LIKE 'PCN%'
+     ORDER BY CAST(SUBSTRING(pettycash_number, 4) AS UNSIGNED) DESC, created_at DESC
      LIMIT 1`,
     [],
   );
@@ -520,13 +451,13 @@ export async function getNextInvoiceNumber() {
 }
 
 export async function getNextVoucherNumber() {
-  return incrementPrefixedSequentialNumber(await getLatestVoucherNumber(), "VN");
+  return incrementPrefixedSequentialNumber(await getLatestVoucherNumber(), "PVN");
 }
 
 export async function getNextPettyCashNumber() {
   return incrementPrefixedSequentialNumber(
     await getLatestPettyCashNumber(),
-    "PC",
+    "PCN",
   );
 }
 

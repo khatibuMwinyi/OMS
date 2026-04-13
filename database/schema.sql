@@ -1,15 +1,18 @@
-CREATE DATABASE IF NOT EXISTS oweru_db;
-USE oweru_db;
+-- Create database if it doesn't exist
+CREATE DATABASE IF NOT EXISTS owerumg;
+USE owerumg;
 
+-- Users table
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(100) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
   role ENUM('admin', 'secretary') NOT NULL DEFAULT 'secretary',
-  signature_image_path VARCHAR(500),
+  signature_image_path VARCHAR(500), -- nullable by default
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Invoices table
 CREATE TABLE IF NOT EXISTS invoices (
   id INT AUTO_INCREMENT PRIMARY KEY,
   invoice_number VARCHAR(50) NOT NULL,
@@ -31,7 +34,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   grand_total DECIMAL(10,2) NOT NULL,
   sent_at TIMESTAMP NULL,
   sent_by INT,
-  sent_via ENUM('whatsapp', 'email'),
+  sent_via ENUM('whatsapp','email'),
   user_id INT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_invoices_user_created (user_id, created_at),
@@ -39,6 +42,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   FOREIGN KEY (sent_by) REFERENCES users(id)
 );
 
+-- Invoice items
 CREATE TABLE IF NOT EXISTS invoice_items (
   id INT AUTO_INCREMENT PRIMARY KEY,
   invoice_id INT NOT NULL,
@@ -51,6 +55,7 @@ CREATE TABLE IF NOT EXISTS invoice_items (
   FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
 );
 
+-- Receipts
 CREATE TABLE IF NOT EXISTS receipts (
   id INT AUTO_INCREMENT PRIMARY KEY,
   receipt_number VARCHAR(50) NOT NULL,
@@ -68,7 +73,7 @@ CREATE TABLE IF NOT EXISTS receipts (
   receipt_date DATE NOT NULL,
   sent_at TIMESTAMP NULL,
   sent_by INT,
-  sent_via ENUM('whatsapp', 'email'),
+  sent_via ENUM('whatsapp','email'),
   user_id INT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_receipts_user_created (user_id, created_at),
@@ -76,6 +81,7 @@ CREATE TABLE IF NOT EXISTS receipts (
   FOREIGN KEY (sent_by) REFERENCES users(id)
 );
 
+-- Petty cash transactions
 CREATE TABLE IF NOT EXISTS petty_cash_transactions (
   id INT AUTO_INCREMENT PRIMARY KEY,
   date DATE NOT NULL,
@@ -92,6 +98,7 @@ CREATE TABLE IF NOT EXISTS petty_cash_transactions (
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- Payment vouchers
 CREATE TABLE IF NOT EXISTS payment_vouchers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   voucher_number VARCHAR(50) NOT NULL,
@@ -110,7 +117,7 @@ CREATE TABLE IF NOT EXISTS payment_vouchers (
   category VARCHAR(100) NOT NULL,
   description VARCHAR(255) NOT NULL,
   amount DECIMAL(10,2) NOT NULL,
-  status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+  status ENUM('pending','approved','rejected') DEFAULT 'pending',
   admin_comment TEXT,
   approved_by INT,
   approved_at TIMESTAMP NULL,
@@ -125,6 +132,7 @@ CREATE TABLE IF NOT EXISTS payment_vouchers (
   FOREIGN KEY (rejected_by) REFERENCES users(id)
 );
 
+-- Payment voucher config
 CREATE TABLE IF NOT EXISTS payment_voucher_config (
   id INT AUTO_INCREMENT PRIMARY KEY,
   initial_voucher_number INT DEFAULT 1,
@@ -134,19 +142,20 @@ CREATE TABLE IF NOT EXISTS payment_voucher_config (
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- Printed letters
 CREATE TABLE IF NOT EXISTS printed_letters (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   reference_number VARCHAR(50),
   description TEXT,
   pdf_path VARCHAR(500) NOT NULL,
-  status ENUM('pending', 'approved') NOT NULL DEFAULT 'pending',
+  status ENUM('pending','approved') NOT NULL DEFAULT 'pending',
   approved_by INT,
   approved_at TIMESTAMP NULL,
   approved_signature_path VARCHAR(500),
   sent_at TIMESTAMP NULL,
   sent_by INT,
-  sent_via ENUM('whatsapp', 'email'),
+  sent_via ENUM('whatsapp','email'),
   user_id INT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_printed_letters_status_created (status, created_at),
@@ -156,6 +165,7 @@ CREATE TABLE IF NOT EXISTS printed_letters (
   FOREIGN KEY (sent_by) REFERENCES users(id)
 );
 
+-- Letter content
 CREATE TABLE IF NOT EXISTS letter_content (
   id INT AUTO_INCREMENT PRIMARY KEY,
   letter_id INT NOT NULL UNIQUE,
@@ -169,6 +179,7 @@ CREATE TABLE IF NOT EXISTS letter_content (
   FOREIGN KEY (letter_id) REFERENCES printed_letters(id) ON DELETE CASCADE
 );
 
+-- Incoming letters
 CREATE TABLE IF NOT EXISTS incoming_letters (
   id INT AUTO_INCREMENT PRIMARY KEY,
   reference_number VARCHAR(50),
@@ -187,6 +198,7 @@ CREATE TABLE IF NOT EXISTS incoming_letters (
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- Ranges tables
 CREATE TABLE IF NOT EXISTS invoice_ranges (
   id INT AUTO_INCREMENT PRIMARY KEY,
   start_range INT NOT NULL,
@@ -221,6 +233,7 @@ CREATE TABLE IF NOT EXISTS petty_cash_ranges (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+-- Petty cash config
 CREATE TABLE IF NOT EXISTS petty_cash_config (
   id INT AUTO_INCREMENT PRIMARY KEY,
   initial_cash DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -230,5 +243,6 @@ CREATE TABLE IF NOT EXISTS petty_cash_config (
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- Default users
 INSERT IGNORE INTO users (username, password, role) VALUES ('admin', 'admin123', 'admin');
 INSERT IGNORE INTO users (username, password, role) VALUES ('secretary', '1234', 'secretary');

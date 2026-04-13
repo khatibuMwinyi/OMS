@@ -12,17 +12,16 @@ type StatCardProps = {
 export function StatCard({ label, value, detail, icon: Icon }: StatCardProps) {
   return (
     <Card className="stat-card">
-      <CardContent className="px-4 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-5">
-        <div className="flex items-start justify-between gap-3 sm:gap-5">
-          <div>
+      <CardContent className="px-3 pb-3 pt-4 sm:px-4 sm:pb-4 sm:pt-4">
+        <div className="flex items-start justify-between gap-3 sm:gap-4">
+          <div className="min-w-0">
             <div className="stat-label">{label}</div>
             <div className="stat-value">{value}</div>
-            <div className="stat-detail">{detail}</div>
+            <div className="stat-detail hidden sm:block">{detail}</div>
           </div>
           {Icon ? (
-            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-primary/10 text-primary sm:h-11 sm:w-11">
-              <Icon size={16} className="sm:hidden" />
-              <Icon size={18} className="hidden sm:block" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-2xl bg-primary/10 text-primary sm:h-10 sm:w-10">
+              <Icon size={16} />
             </div>
           ) : null}
         </div>

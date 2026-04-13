@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
+import { DashboardModuleToggle } from "@/components/dashboard-module-toggle";
 import { RecentRecords } from "@/components/recent-records";
 import { StatCard } from "@/components/stat-card";
 import { Badge } from "@/components/ui/badge";
@@ -145,7 +146,7 @@ export default async function DashboardPage() {
         </section>
 
         <section className="section-grid">
-          <div className="section-card" style={{ gridColumn: "span 12" }}>
+          <div style={{ gridColumn: "span 12" }}>
             <div className="section-head">
               <div>
                 <span className="eyebrow">Recent records</span>
@@ -157,195 +158,242 @@ export default async function DashboardPage() {
               </span>
             </div>
 
-            <div className="recent-records-stack">
-              <RecentRecords
-                title="Invoices"
-                emptyText="No invoices found yet."
-                columns={{
-                  record: "Invoice",
-                  details: "Customer",
-                  value: "Amount",
-                }}
-                getShareDocument={(item) => {
-                  const source = overview.recentInvoices.find(
-                    (record) => record.id === item.id,
-                  );
-                  const summary =
-                    invoiceSummaries.get(item.id) ?? `Invoice ${item.title}`;
-
-                  return {
-                    type: "invoice",
-                    title: `Invoice ${item.title}`,
-                    summary,
-                    recipientPhone: source?.phone ?? null,
-                  };
-                }}
-                getEditHref={(item) => {
-                  const source = overview.recentInvoices.find(
-                    (record) => record.id === item.id,
-                  );
-                  if (!source || source.sentAt) {
-                    return null;
-                  }
-
-                  return `/invoices?edit=${item.id}`;
-                }}
-                getDownloadHref={(item) => `/api/export/invoice/${item.id}`}
-                items={overview.recentInvoices.map((item) => ({
-                  id: item.id,
-                  title: item.invoiceNumber,
-                  subtitle: `${item.customerName} · ${formatDate(item.invoiceDate)}${item.sentAt ? " · sent" : ""}`,
-                  value: formatTZS(Number(item.grandTotal ?? 0)),
-                }))}
+            <div className="recent-records-stack space-y-4">
+              <DashboardModuleToggle
+                modules={[
+                  { key: "invoices", label: "Invoices" },
+                  { key: "receipts", label: "Receipts" },
+                  { key: "petty-cash", label: "Petty Cash" },
+                  { key: "payment-vouchers", label: "Payment Vouchers" },
+                  { key: "letters", label: "Letters" },
+                ]}
+                defaultModule="invoices"
               />
 
-              <RecentRecords
-                title="Receipts"
-                emptyText="No receipts found yet."
-                columns={{
-                  record: "Receipt",
-                  details: "Customer",
-                  value: "Amount",
-                }}
-                getShareDocument={(item) => {
-                  const source = overview.recentReceipts.find(
-                    (record) => record.id === item.id,
-                  );
-                  const summary =
-                    receiptSummaries.get(item.id) ?? `Receipt ${item.title}`;
+              <div className="space-y-4">
+                <div
+                  data-dashboard-module="invoices"
+                  className="dashboard-module-panel"
+                >
+                  <RecentRecords
+                    title="Invoices"
+                    variant="table"
+                    emptyText="No invoices found yet."
+                    columns={{
+                      record: "Invoice",
+                      details: "Customer",
+                      value: "Amount",
+                    }}
+                    getShareDocument={(item) => {
+                      const source = overview.recentInvoices.find(
+                        (record) => record.id === item.id,
+                      );
+                      const summary =
+                        invoiceSummaries.get(item.id) ?? `Invoice ${item.title}`;
 
-                  return {
-                    type: "receipt",
-                    title: `Receipt ${item.title}`,
-                    summary,
-                    recipientPhone: source?.phone ?? null,
-                  };
-                }}
-                getEditHref={(item) => {
-                  const source = overview.recentReceipts.find(
-                    (record) => record.id === item.id,
-                  );
-                  if (!source || source.sentAt) {
-                    return null;
-                  }
+                      return {
+                        type: "invoice",
+                        title: `Invoice ${item.title}`,
+                        summary,
+                        recipientPhone: source?.phone ?? null,
+                      };
+                    }}
+                    getEditHref={(item) => {
+                      const source = overview.recentInvoices.find(
+                        (record) => record.id === item.id,
+                      );
+                      if (!source || source.sentAt) {
+                        return null;
+                      }
 
-                  return `/receipts?edit=${item.id}`;
-                }}
-                getDownloadHref={(item) => `/api/export/receipt/${item.id}`}
-                items={overview.recentReceipts.map((item) => ({
-                  id: item.id,
-                  title: item.receiptNumber,
-                  subtitle: `${item.customerName} · ${formatDate(item.receiptDate)} · ${item.paymentMethod}${item.sentAt ? " · sent" : ""}`,
-                  value: formatTZS(Number(item.amount ?? 0)),
-                }))}
-              />
+                      return `/invoices?edit=${item.id}`;
+                    }}
+                    getDownloadHref={(item) => `/api/export/invoice/${item.id}`}
+                    items={overview.recentInvoices.map((item) => ({
+                      id: item.id,
+                      title: item.invoiceNumber,
+                      subtitle: `${item.customerName} · ${formatDate(item.invoiceDate)}${item.sentAt ? " · sent" : ""}`,
+                      value: formatTZS(Number(item.grandTotal ?? 0)),
+                    }))}
+                  />
+                </div>
 
-              <RecentRecords
-                title="Petty cash vouchers"
-                emptyText="No petty cash voucher records found yet."
-                columns={{
-                  record: "Entry",
-                  details: "Description",
-                  value: "Amount",
-                }}
-                getDownloadHref={(item) => `/api/export/petty-cash-voucher/${item.id}`}
-                items={overview.recentPettyCash.map((item) => ({
-                  id: item.id,
-                  title: item.pettycashNumber || item.code || item.referenceNumber || item.description,
-                  subtitle: `${item.description} · ${item.category} · ${formatDate(item.date)}`,
-                  value: formatTZS(Number(item.amount ?? 0)),
-                }))}
-              />
+                <div
+                  data-dashboard-module="receipts"
+                  className="dashboard-module-panel hidden"
+                >
+                  <RecentRecords
+                    title="Receipts"
+                    variant="table"
+                    emptyText="No receipts found yet."
+                    columns={{
+                      record: "Receipt",
+                      details: "Customer",
+                      value: "Amount",
+                    }}
+                    getShareDocument={(item) => {
+                      const source = overview.recentReceipts.find(
+                        (record) => record.id === item.id,
+                      );
+                      const summary =
+                        receiptSummaries.get(item.id) ?? `Receipt ${item.title}`;
 
-              <RecentRecords
-                title="Payment vouchers"
-                emptyText="No payment vouchers found yet."
-                columns={{
-                  record: "Payment voucher",
-                  details: "Status",
-                  value: "Amount",
-                }}
-                getEditHref={(item) => {
-                  const source = overview.recentVouchers.find(
-                    (record) => record.id === item.id,
-                  );
-                  if (!source || source.status === "approved") {
-                    return null;
-                  }
+                      return {
+                        type: "receipt",
+                        title: `Receipt ${item.title}`,
+                        summary,
+                        recipientPhone: source?.phone ?? null,
+                      };
+                    }}
+                    getEditHref={(item) => {
+                      const source = overview.recentReceipts.find(
+                        (record) => record.id === item.id,
+                      );
+                      if (!source || source.sentAt) {
+                        return null;
+                      }
 
-                  if (session.role === "admin") {
-                    return `/payment-vouchers?edit=${item.id}`;
-                  }
+                      return `/receipts?edit=${item.id}`;
+                    }}
+                    getDownloadHref={(item) => `/api/export/receipt/${item.id}`}
+                    items={overview.recentReceipts.map((item) => ({
+                      id: item.id,
+                      title: item.receiptNumber,
+                      subtitle: `${item.customerName} · ${formatDate(item.receiptDate)} · ${item.paymentMethod}${item.sentAt ? " · sent" : ""}`,
+                      value: formatTZS(Number(item.amount ?? 0)),
+                    }))}
+                  />
+                </div>
 
-                  return source.status === "rejected"
-                    ? `/payment-vouchers?edit=${item.id}`
-                    : null;
-                }}
-                getDownloadHref={(item) => `/api/export/payment-voucher/${item.id}`}
-                items={overview.recentVouchers.map((item) => ({
-                  id: item.id,
-                  title: item.voucherNumber,
-                  subtitle: (
-                    <span className="inline-flex flex-wrap items-center gap-2">
-                      <span>{item.category}</span>
-                      <span aria-hidden="true">&middot;</span>
-                      {renderVoucherStatus(item.status)}
-                      <span aria-hidden="true">&middot;</span>
-                      <span>{formatDate(item.voucherDate)}</span>
-                    </span>
-                  ),
-                  value: formatTZS(Number(item.amount ?? 0)),
-                }))}
-              />
+                <div
+                  data-dashboard-module="petty-cash"
+                  className="dashboard-module-panel hidden"
+                >
+                  <RecentRecords
+                    title="Petty cash vouchers"
+                    variant="table"
+                    emptyText="No petty cash voucher records found yet."
+                    columns={{
+                      record: "Entry",
+                      details: "Description",
+                      value: "Amount",
+                    }}
+                    getDownloadHref={(item) => `/api/export/petty-cash-voucher/${item.id}`}
+                    items={overview.recentPettyCash.map((item) => ({
+                      id: item.id,
+                      title:
+                        item.pettycashNumber ||
+                        item.code ||
+                        item.referenceNumber ||
+                        item.description,
+                      subtitle: `${item.description} · ${item.category} · ${formatDate(item.date)}`,
+                      value: formatTZS(Number(item.amount ?? 0)),
+                    }))}
+                  />
+                </div>
 
-              <RecentRecords
-                title="Printed letters"
-                emptyText="No letters found yet."
-                columns={{
-                  record: "Recipient",
-                  details: "Subject / Created",
-                  value: "Status",
-                }}
-                getShareDocument={(item) => {
-                  const source = overview.recentLetters.find(
-                    (record) => record.id === item.id,
-                  );
-                  if (!source || source.status !== "approved") {
-                    return null;
-                  }
+                <div
+                  data-dashboard-module="payment-vouchers"
+                  className="dashboard-module-panel hidden"
+                >
+                  <RecentRecords
+                    title="Payment vouchers"
+                    variant="table"
+                    emptyText="No payment vouchers found yet."
+                    columns={{
+                      record: "Payment voucher",
+                      details: "Status",
+                      value: "Amount",
+                    }}
+                    getEditHref={(item) => {
+                      const source = overview.recentVouchers.find(
+                        (record) => record.id === item.id,
+                      );
+                      if (!source || source.status === "approved") {
+                        return null;
+                      }
 
-                  return {
-                    type: "letter",
-                    title: `Letter ${source.name}`,
-                    summary: `Subject: ${source.description || "Official letter"}\nStatus: ${source.status}`,
-                  };
-                }}
-                getEditHref={(item) => {
-                  const source = overview.recentLetters.find(
-                    (record) => record.id === item.id,
-                  );
-                  if (!source) {
-                    return null;
-                  }
+                      if (session.role === "admin") {
+                        return `/payment-vouchers?edit=${item.id}`;
+                      }
 
-                  if (session.role === "admin") {
-                    return `/letters?edit=${item.id}`;
-                  }
+                      return source.status === "rejected"
+                        ? `/payment-vouchers?edit=${item.id}`
+                        : null;
+                    }}
+                    getDownloadHref={(item) => `/api/export/payment-voucher/${item.id}`}
+                    items={overview.recentVouchers.map((item) => ({
+                      id: item.id,
+                      title: item.voucherNumber,
+                      subtitle: (
+                        <span className="inline-flex flex-wrap items-center gap-2">
+                          <span>{item.category}</span>
+                          <span aria-hidden="true">&middot;</span>
+                          {renderVoucherStatus(item.status)}
+                          <span aria-hidden="true">&middot;</span>
+                          <span>{formatDate(item.voucherDate)}</span>
+                        </span>
+                      ),
+                      value: formatTZS(Number(item.amount ?? 0)),
+                    }))}
+                  />
+                </div>
 
-                  return source.status === "pending"
-                    ? `/letters?edit=${item.id}`
-                    : null;
-                }}
-                getDownloadHref={(item) => `/api/export/letter/${item.id}`}
-                items={overview.recentLetters.map((item) => ({
-                  id: item.id,
-                  title: item.name,
-                  subtitle: item.description
-                    ? `${item.description.slice(0, 90)} · ${formatDate(item.createdAt)}`
-                    : `No subject stored · ${formatDate(item.createdAt)}`,
-                  value: renderLetterStatus(item.status),
-                }))}
-              />
+                <div
+                  data-dashboard-module="letters"
+                  className="dashboard-module-panel hidden"
+                >
+                  <RecentRecords
+                    title="Printed letters"
+                    variant="table"
+                    emptyText="No letters found yet."
+                    columns={{
+                      record: "Recipient",
+                      details: "Subject / Created",
+                      value: "Status",
+                    }}
+                    getShareDocument={(item) => {
+                      const source = overview.recentLetters.find(
+                        (record) => record.id === item.id,
+                      );
+                      if (!source || source.status !== "approved") {
+                        return null;
+                      }
+
+                      return {
+                        type: "letter",
+                        title: `Letter ${source.name}`,
+                        summary: `Subject: ${source.description || "Official letter"}\nStatus: ${source.status}`,
+                      };
+                    }}
+                    getEditHref={(item) => {
+                      const source = overview.recentLetters.find(
+                        (record) => record.id === item.id,
+                      );
+                      if (!source) {
+                        return null;
+                      }
+
+                      if (session.role === "admin") {
+                        return `/letters?edit=${item.id}`;
+                      }
+
+                      return source.status === "pending"
+                        ? `/letters?edit=${item.id}`
+                        : null;
+                    }}
+                    getDownloadHref={(item) => `/api/export/letter/${item.id}`}
+                    items={overview.recentLetters.map((item) => ({
+                      id: item.id,
+                      title: item.name,
+                      subtitle: item.description
+                        ? `${item.description.slice(0, 90)} · ${formatDate(item.createdAt)}`
+                        : `No subject stored · ${formatDate(item.createdAt)}`,
+                      value: renderLetterStatus(item.status),
+                    }))}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </section>
