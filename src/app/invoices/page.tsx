@@ -304,7 +304,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
               getDownloadHref={(item) => `/api/export/invoice/${item.id}`}
               items={invoices.map((item) => ({
                 id: item.id,
-                title: item.invoiceNumber,
+                title: (item.invoiceNumber || "").replace(/^#?PCV/, "PCN"),
                 subtitle: `${item.customerName} · ${formatDate(item.invoiceDate)}${item.sentAt ? " · sent" : ""}`,
                 value: formatTZS(Number(item.grandTotal ?? 0)),
               }))}

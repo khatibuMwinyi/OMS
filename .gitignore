@@ -1,5 +1,4 @@
 .env.example
 .env.local
 .next/
-public/uploads/
 tsconfig.tsbuildinfo
