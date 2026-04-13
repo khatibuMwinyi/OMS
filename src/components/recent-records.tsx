@@ -32,6 +32,7 @@ type RecentRecordsProps = {
   getEditHref?: (item: RecordItem) => string | null | undefined;
   getPreviewHref?: (item: RecordItem) => string | null | undefined;
   getDownloadHref?: (item: RecordItem) => string | null | undefined;
+  variant?: "card" | "table";
 };
 
 async function getRequestOrigin() {
@@ -75,6 +76,7 @@ export async function RecentRecords({
   getEditHref,
   getPreviewHref,
   getDownloadHref,
+  variant = "card",
 }: RecentRecordsProps) {
   const hasActions =
     typeof getShareDocument === "function" ||
@@ -88,8 +90,8 @@ export async function RecentRecords({
     return url.toString();
   }
 
-  return (
-    <Card className="recent-card">
+  const content = (
+    <>
       <CardHeader className="flex-row items-center justify-between gap-3 px-5 py-5">
         <CardTitle className="section-title text-lg">{title}</CardTitle>
         <Badge variant="secondary">Latest 5</Badge>
@@ -193,6 +195,12 @@ export async function RecentRecords({
           <div className="empty-state">{emptyText}</div>
         )}
       </CardContent>
-    </Card>
+    </>
+  );
+
+  return variant === "card" ? (
+    <Card className="recent-card">{content}</Card>
+  ) : (
+    <div className="recent-records-table">{content}</div>
   );
 }

@@ -258,11 +258,11 @@
   }
 
   .field-label {
-    @apply mb-2 block text-sm font-medium text-secondary;
+    @apply mb-2 block text-sm font-semibold text-accent;
   }
 
   .input {
-    @apply flex h-11 w-full rounded-xl border border-primary/25 bg-card/75 px-4 py-2.5 text-sm text-foreground shadow-sm transition placeholder:text-muted-foreground focus:border-primary/60 focus:outline-none focus:ring-4 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50;
+    @apply flex h-11 w-full rounded-xl border border-accent/50 bg-card/75 px-4 py-2.5 text-sm text-foreground shadow-sm transition placeholder:text-accent/40 focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent/20 disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .login-error {
@@ -532,7 +532,7 @@
   }
 
   .record-field-label {
-    @apply block text-sm font-semibold text-primary;
+    @apply block text-sm font-semibold text-accent;
     font-family: "Futura PT", var(--font-body), sans-serif;
   }
 
@@ -586,44 +586,54 @@
   }
 
   .record-table-wrapper {
-    @apply overflow-hidden rounded-2xl border shadow-sm;
-    background: linear-gradient(180deg, rgba(255,255,255,0.14), rgba(223,224,220,0.08));
-    border-color: rgba(223,224,220,0.22);
+    @apply overflow-x-auto rounded-3xl border border-accent/20 shadow-soft bg-card/90;
+    background-image: linear-gradient(180deg, rgba(214, 170, 52, 0.08), rgba(17, 25, 44, 0.85));
   }
 
   .record-table {
-    @apply w-full text-left text-sm;
-    border-collapse: separate;
-    border-spacing: 0 0.25rem;
+    @apply w-full min-w-[720px] text-left text-sm;
+    border-collapse: collapse;
   }
 
   .record-table th,
   .record-table td {
-    @apply border-b px-4 py-3 align-top;
-    border-color: rgba(223,224,220,0.18);
+    @apply px-4 py-4 align-top;
+    border-bottom: 1px solid rgba(214, 170, 52, 0.18);
   }
 
   .record-table th {
-    @apply font-semibold;
-    background: rgba(223,224,220,0.2);
-    color: var(--surface-foreground);
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-accent-foreground;
+    background: rgba(214, 170, 52, 0.08);
   }
 
   .record-table tbody tr {
-    background: rgba(255,255,255,0.06);
-    transition: background 0.2s ease;
+    background: rgba(255, 255, 255, 0.05);
+    transition: background 0.2s ease, transform 0.2s ease;
   }
 
   .record-table tbody tr:nth-child(even) {
-    background: rgba(255,255,255,0.09);
+    background: rgba(255, 255, 255, 0.08);
   }
 
   .record-table tbody tr:hover {
-    background: rgba(255,255,255,0.16);
+    background: rgba(214, 170, 52, 0.18);
+    transform: translateY(-1px);
   }
 
   .record-table td {
-    @apply text-foreground/85;
+    @apply text-foreground/90;
+  }
+
+  .record-table td:first-child {
+    width: 35%;
+  }
+
+  .record-table td:nth-child(3) {
+    @apply text-right;
+  }
+
+  .record-table td:last-child {
+    @apply text-right;
   }
 
   .sidebar-link svg {
@@ -633,60 +643,42 @@
 
 @media (max-width: 1023px) {
   .record-table-wrapper {
-    @apply border-0 bg-transparent;
+    @apply overflow-x-auto rounded-3xl border border-border/70;
+    background: hsl(var(--surface) / 0.9);
   }
 
   .record-table {
-    @apply block w-full;
+    @apply min-w-[640px];
   }
 
-  .record-table thead {
-    display: none;
-  }
-
-  .record-table tbody,
-  .record-table tr,
+  .record-table th,
   .record-table td {
-    @apply block w-full;
+    @apply px-4 py-3;
   }
 
-  .record-table tr {
-    @apply mb-3 overflow-hidden rounded-2xl border border-border bg-card/90 shadow-sm;
-  }
-
-  .record-table td {
-    @apply flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4 border-b border-border/70 px-4 py-3;
-  }
-
-  .record-table td::before {
-    content: attr(data-label);
-    @apply text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground shrink-0 order-first;
-  }
-
-  .record-table td:last-child {
-    @apply border-b-0;
-  }
-
-  .record-table td:last-child,
-  .record-table td[data-label="Action"] {
-    @apply justify-end;
-  }
-
-  .record-table td[data-label="Action"]::before {
-    @apply hidden;
-  }
-
-  .record-table td input,
-  .record-table td .input {
-    @apply w-full;
-  }
-
-  .record-table--editor td {
-    @apply items-stretch;
+  .record-table th {
+    @apply text-[0.68rem];
   }
 }
 
 @media (max-width: 720px) {
+  .record-table-wrapper {
+    @apply rounded-2xl;
+  }
+
+  .record-table th,
+  .record-table td {
+    @apply px-3 py-3;
+  }
+
+  .record-table th {
+    @apply text-[0.68rem];
+  }
+
+  .record-table td {
+    @apply text-sm;
+  }
+
   .auth-shell,
   .dashboard-shell,
   .page-shell {

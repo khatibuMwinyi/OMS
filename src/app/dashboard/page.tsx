@@ -146,7 +146,7 @@ export default async function DashboardPage() {
         </section>
 
         <section className="section-grid">
-          <div className="section-card" style={{ gridColumn: "span 12" }}>
+          <div style={{ gridColumn: "span 12" }}>
             <div className="section-head">
               <div>
                 <span className="eyebrow">Recent records</span>
@@ -177,6 +177,7 @@ export default async function DashboardPage() {
                 >
                   <RecentRecords
                     title="Invoices"
+                    variant="table"
                     emptyText="No invoices found yet."
                     columns={{
                       record: "Invoice",
@@ -223,6 +224,7 @@ export default async function DashboardPage() {
                 >
                   <RecentRecords
                     title="Receipts"
+                    variant="table"
                     emptyText="No receipts found yet."
                     columns={{
                       record: "Receipt",
@@ -269,6 +271,7 @@ export default async function DashboardPage() {
                 >
                   <RecentRecords
                     title="Petty cash vouchers"
+                    variant="table"
                     emptyText="No petty cash voucher records found yet."
                     columns={{
                       record: "Entry",
@@ -295,6 +298,7 @@ export default async function DashboardPage() {
                 >
                   <RecentRecords
                     title="Payment vouchers"
+                    variant="table"
                     emptyText="No payment vouchers found yet."
                     columns={{
                       record: "Payment voucher",
@@ -341,6 +345,7 @@ export default async function DashboardPage() {
                 >
                   <RecentRecords
                     title="Printed letters"
+                    variant="table"
                     emptyText="No letters found yet."
                     columns={{
                       record: "Recipient",
