@@ -128,6 +128,33 @@ export const legacyVoucherRecords: LegacySelectionRecord[] = [
   { type: "Expense", category: "Build With Oweru", code: "EC-605", description: "Construction Drawings / Design Fees" },
   { type: "Expense", category: "Build With Oweru", code: "EC-606", description: "Site Clearing & Preparation" },
   { type: "Expense", category: "Build With Oweru", code: "EC-607", description: "Site Measurement Tools & PPE" },
+    // --- BEGIN: Added missing entries from user-provided table (not already present) ---
+    { type: "Expense", category: "Admin & Office", code: "EC-001", description: "Office Rent" },
+    { type: "Expense", category: "Admin & Office", code: "EC-002", description: "Utilities (Electricity, Water, Internet)" },
+    { type: "Expense", category: "Admin & Office", code: "EC-003", description: "Office Supplies / Stationery" },
+    { type: "Expense", category: "Admin & Office", code: "EC-004", description: "Office Equipment Purchase" },
+    { type: "Expense", category: "Admin & Office", code: "EC-005", description: "Equipment Maintenance & Repairs" },
+    { type: "Expense", category: "Admin & Office", code: "EC-006", description: "Communication Costs" },
+    { type: "Expense", category: "Admin & Office", code: "EC-007", description: "Office Furniture" },
+    { type: "Expense", category: "Admin & Office", code: "EC-008", description: "Decoration, Office Branding & Tools" },
+    { type: "Expense", category: "Admin & Office", code: "EC-009", description: "Utensils (Kitchen/Office)" },
+    { type: "Expense", category: "Finance & Banking", code: "EC-010", description: "Bank Charges & Transaction Fees" },
+    { type: "Expense", category: "Finance & Banking", code: "EC-011", description: "Loan Interest Expense" },
+    { type: "Expense", category: "Finance & Banking", code: "EC-012", description: "Discounts Allowed" },
+    { type: "Expense", category: "Staff & HR", code: "EC-101", description: "Staff Salaries" },
+    { type: "Expense", category: "Staff & HR", code: "EC-102", description: "NSSF / PPF Contributions" },
+    { type: "Expense", category: "Staff & HR", code: "EC-103", description: "WCF Contributions" },
+    { type: "Expense", category: "Staff & HR", code: "EC-104", description: "Staff Allowances / Bonus" },
+    { type: "Expense", category: "Staff & HR", code: "EC-105", description: "Training & Capacity Building" },
+    { type: "Expense", category: "Staff & HR", code: "EC-106", description: "Staff Meals / Refreshments" },
+    { type: "Expense", category: "Staff & HR", code: "EC-107", description: "Office Uniforms & PPE" },
+    { type: "Expense", category: "Staff & HR", code: "EC-108", description: "Wages (Casual Labour)" },
+    { type: "Expense", category: "Staff & HR", code: "EC-109", description: "Travel Allowance / Per Diem" },
+    { type: "Expense", category: "Investment Gateway", code: "EC-501", description: "Investor Facilitation Costs" },
+    { type: "Expense", category: "Investment Gateway", code: "EC-502", description: "Documentation Preparation" },
+    { type: "Expense", category: "Investment Gateway", code: "EC-503", description: "Partnership Meetings" },
+    { type: "Expense", category: "Investment Gateway", code: "EC-504", description: "Visa Processing Fees" },
+    // --- END: Added missing entries from user-provided table ---
 ];
 
 function unique(values: Array<string | null | undefined>) {
