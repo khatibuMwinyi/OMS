@@ -4,28 +4,28 @@
 
 @layer base {
   :root {
-    --background: 216 26% 16%;
-    --foreground: 214 28% 94%;
-    --card: 215 20% 18%;
-    --card-foreground: 214 30% 96%;
-    --popover: 215 18% 24%;
-    --popover-foreground: 214 35% 96%;
-    --primary: 42 88% 60%;
-    --primary-foreground: 210 14% 12%;
-    --secondary: 216 35% 32%;
-    --secondary-foreground: 214 39% 96%;
-    --muted: 214 18% 60%;
-    --muted-foreground: 214 28% 78%;
+    --background: 48 44% 97%; /* Creamy white */
+    --foreground: 220 28% 18%; /* Navy text */
+    --card: 48 44% 100%;
+    --card-foreground: 220 28% 18%;
+    --popover: 48 44% 98%;
+    --popover-foreground: 220 28% 18%;
+    --primary: 220 44% 18%; /* Navy */
+    --primary-foreground: 48 44% 97%;
+    --secondary: 45 94% 62%; /* Gold */
+    --secondary-foreground: 220 44% 18%;
+    --muted: 220 18% 60%;
+    --muted-foreground: 220 28% 48%;
     --accent: 45 94% 62%;
-    --accent-foreground: 210 18% 12%;
-    --surface: 42 14% 90%;
-    --surface-color: #DFE0DC;
-    --surface-foreground: 213 17% 17%;
+    --accent-foreground: 220 44% 18%;
+    --surface: 48 44% 100%;
+    --surface-color: #fffbe9;
+    --surface-foreground: 220 28% 18%;
     --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214 18% 40%;
-    --input: 214 18% 24%;
-    --ring: 42 88% 60%;
+    --destructive-foreground: 220 44% 18%;
+    --border: 45 94% 82%;
+    --input: 48 44% 97%;
+    --ring: 45 94% 62%;
     --font-display: "Futura PT", "Poppins", sans-serif;
   }
 
@@ -39,11 +39,7 @@
 
   body {
     @apply min-h-screen bg-background font-body text-foreground antialiased;
-    background:
-      radial-gradient(circle at 10% 4%, rgba(245, 186, 70, 0.18), transparent 28%),
-      radial-gradient(circle at 90% 18%, rgba(42, 119, 204, 0.18), transparent 24%),
-      radial-gradient(circle at 70% 92%, rgba(223, 224, 220, 0.14), transparent 22%),
-      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background) / 0.88) 100%);
+    background: #f9faf7;
   }
 
   body::before {
@@ -284,11 +280,8 @@
 
   .button-primary {
     @apply text-primary-foreground shadow-soft hover:-translate-y-0.5 hover:shadow-lift focus:ring-primary/25;
-    background-image: linear-gradient(
-      90deg,
-      hsl(var(--primary)),
-      hsl(var(--accent))
-    );
+    background-image: linear-gradient(90deg, #1a2236 0%, #d4a23f 60%, #fffbe9 100%);
+    border: none;
   }
 
   .button-secondary {
@@ -499,6 +492,34 @@
     @apply inline-flex items-center gap-2 rounded-full bg-accent/15 px-3 py-1.5 text-xs font-semibold text-primary;
   }
 
+  .category-cards {
+    @apply grid grid-cols-1 gap-4;
+  }
+
+  @media (min-width: 640px) {
+    .category-cards {
+      @apply grid-cols-3;
+    }
+  }
+
+  .category-card {
+    @apply flex flex-col rounded-2xl border border-border bg-card/60 p-6 transition-colors;
+    @apply hover:border-primary/50 hover:bg-card;
+  }
+
+  .category-card-label {
+    @apply text-xs font-semibold uppercase tracking-wider text-muted-foreground;
+  }
+
+  .category-card-title {
+    @apply mt-2 text-xl font-bold text-foreground;
+    @apply group-hover:text-primary;
+  }
+
+  .category-card-desc {
+    @apply mt-1 text-sm text-foreground/70;
+  }
+
   .empty-state {
     @apply rounded-2xl border border-dashed border-border bg-white/5 px-5 py-6 text-center text-sm text-muted-foreground;
   }
@@ -588,52 +609,69 @@
   .record-table-wrapper {
     @apply overflow-x-auto rounded-3xl border border-accent/20 shadow-soft bg-card/90;
     background-image: linear-gradient(180deg, rgba(214, 170, 52, 0.08), rgba(17, 25, 44, 0.85));
+    min-width: 0;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
   }
 
+  .recent-records-table {
+    @apply min-w-0 overflow-x-auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+
   .record-table {
-    @apply w-full min-w-[720px] text-left text-sm;
-    border-collapse: collapse;
+    @apply w-full text-left text-sm rounded-2xl shadow-soft;
+    min-width: 720px;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #fff;
+    color: #222;
   }
 
   .record-table th,
   .record-table td {
     @apply px-4 py-4 align-top;
-    border-bottom: 1px solid rgba(214, 170, 52, 0.18);
+    border-bottom: 1px solid #f3e6c6;
   }
 
   .record-table th {
-    @apply text-xs font-semibold uppercase tracking-[0.18em] text-accent-foreground;
-    background: rgba(214, 170, 52, 0.08);
+    @apply text-xs font-semibold uppercase tracking-[0.18em];
+    background: linear-gradient(90deg, #fffbe9 0%, #fff 100%);
+    color: #d4a23f;
+    border-bottom: 2px solid #d4a23f;
   }
 
   .record-table tbody tr {
-    background: rgba(255, 255, 255, 0.05);
+    background: #fff;
     transition: background 0.2s ease, transform 0.2s ease;
   }
 
   .record-table tbody tr:nth-child(even) {
-    background: rgba(255, 255, 255, 0.08);
+    background: #f9f6ef;
   }
 
   .record-table tbody tr:hover {
-    background: rgba(214, 170, 52, 0.18);
+    background: #fff7e0;
     transform: translateY(-1px);
+    box-shadow: 0 2px 8px 0 rgba(212, 162, 63, 0.08);
   }
 
   .record-table td {
     @apply text-foreground/90;
+    color: #222;
   }
 
   .record-table td:first-child {
     width: 35%;
+    font-weight: 600;
+    color: #d4a23f;
   }
 
-  .record-table td:nth-child(3) {
-    @apply text-right;
-  }
-
+  .record-table td:nth-child(3),
   .record-table td:last-child {
     @apply text-right;
+    color: #222;
   }
 
   .sidebar-link svg {
@@ -645,6 +683,8 @@
   .record-table-wrapper {
     @apply overflow-x-auto rounded-3xl border border-border/70;
     background: hsl(var(--surface) / 0.9);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
   }
 
   .record-table {
@@ -653,7 +693,7 @@
 
   .record-table th,
   .record-table td {
-    @apply px-4 py-3;
+    @apply px-3 py-3;
   }
 
   .record-table th {
@@ -776,6 +816,112 @@
 
   .desktop-sidebar {
     @apply hidden;
+  }
+
+  .category-layout {
+    @apply flex flex-col gap-6;
+  }
+
+  @media (min-width: 1024px) {
+    .category-layout {
+      @apply flex-row;
+    }
+
+    .category-layout > * {
+      @apply w-1/2;
+    }
+  }
+
+  .category-form-card {
+    @apply w-full;
+  }
+
+  .category-list-card {
+    @apply w-full;
+  }
+
+  .category-form {
+    @apply flex flex-col gap-4;
+  }
+
+  .form-field {
+    @apply w-full;
+  }
+
+  .form-field-full {
+    @apply col-span-1;
+  }
+
+  @media (min-width: 640px) {
+    .category-form {
+      @apply grid grid-cols-2;
+    }
+
+    .form-field-full {
+      @apply col-span-2;
+    }
+  }
+
+  .form-field label {
+    @apply block text-sm font-semibold text-foreground mb-1;
+  }
+
+  .form-actions {
+    @apply flex flex-col gap-3 col-span-1 col-span-2;
+  }
+
+  @media (min-width: 640px) {
+    .form-actions {
+      @apply flex-row;
+    }
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors;
+  }
+
+  .btn-outline {
+    @apply border border-border bg-transparent text-foreground hover:bg-primary/10;
+  }
+
+  .category-list {
+    @apply flex flex-col gap-3;
+  }
+
+  .category-item {
+    @apply flex flex-col gap-1 rounded-xl border border-border bg-card/60 p-4;
+  }
+
+  .category-item-header {
+    @apply flex items-center justify-between;
+  }
+
+  .category-item-code {
+    @apply font-mono text-sm font-bold text-primary;
+  }
+
+  .category-item-actions {
+    @apply flex gap-3;
+  }
+
+  .category-action-edit {
+    @apply text-sm text-primary hover:underline;
+  }
+
+  .category-item-name {
+    @apply font-semibold text-foreground;
+  }
+
+  .category-item-type {
+    @apply text-sm text-foreground/70;
+  }
+
+  .category-item-desc {
+    @apply text-sm text-muted-foreground;
+  }
+
+  .category-empty {
+    @apply py-8 text-center text-muted-foreground;
   }
 }
 
