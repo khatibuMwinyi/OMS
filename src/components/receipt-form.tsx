@@ -9,11 +9,12 @@ import { RecordFieldRow } from "@/components/record-field-row";
 import { ReceiptPaymentFields } from "@/components/receipt-payment-fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { legacyReceiptRecords } from "@/lib/legacy-form-data";
 import {
   createReceiptAction,
   updateReceiptAction,
 } from "@/app/actions/records";
+import type { CategoryRecord } from "@/lib/categories";
+import { legacyReceiptRecords, type LegacySelectionRecord } from "@/lib/legacy-form-data";
 
 type ReceiptFormDocument = {
   id: number;
@@ -35,6 +36,7 @@ type ReceiptFormProps = {
   isEditing: boolean;
   nextReceiptNumber: string;
   document: ReceiptFormDocument | null;
+  categories?: CategoryRecord[];
 };
 
 type ReceiptFormState = {
@@ -49,9 +51,18 @@ export function ReceiptForm({
   isEditing,
   nextReceiptNumber,
   document,
+  categories,
 }: ReceiptFormProps) {
   const router = useRouter();
   const lastHandledResult = useRef("");
+  
+  const records: LegacySelectionRecord[] = categories?.map(cat => ({
+    type: cat.type || "",
+    category: cat.category,
+    code: cat.code,
+    description: cat.description || "",
+  })) ?? legacyReceiptRecords;
+  
   const [submissionState, formAction, isPending] = useActionState<
     ReceiptFormState,
     FormData

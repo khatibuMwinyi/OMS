@@ -9,9 +9,11 @@ import {
   legacyVoucherRecords,
   type LegacySelectionRecord,
 } from "@/lib/legacy-form-data";
+import type { CategoryRecord } from "@/lib/categories";
 
 type VoucherFormFieldsProps = {
-  voucherNumber: string;
+  categories?: CategoryRecord[];
+  voucherNumber?: string;
   templates?: LegacySelectionRecord[];
   defaultDate?: string | null;
   defaultCustomerName?: string | null;
@@ -31,8 +33,9 @@ type VoucherFormFieldsProps = {
 };
 
 export function VoucherFormFields({
-  templates,
+  categories,
   voucherNumber,
+  templates,
   defaultDate,
   defaultCustomerName,
   defaultPaymentMethod,
@@ -56,7 +59,15 @@ export function VoucherFormFields({
       ? defaultPaymentMethod
       : "Cash",
   );
-  const mergedRecords = [...legacyVoucherRecords, ...(templates ?? [])].filter(
+
+  const records: LegacySelectionRecord[] = categories?.map(cat => ({
+    type: cat.type || "",
+    category: cat.category,
+    code: cat.code,
+    description: cat.description || "",
+  })) ?? legacyVoucherRecords;
+
+  const mergedRecords = [...legacyVoucherRecords, ...records].filter(
     (record, index, allRecords) =>
       index ===
       allRecords.findIndex(

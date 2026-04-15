@@ -14,6 +14,7 @@ import {
   listVouchers,
 } from "@/lib/records";
 import { normalizeReportPeriod } from "@/lib/report-period";
+import { getCategoriesWithFallback } from "@/lib/categories";
 import { getCurrentSession } from "@/lib/session-server";
 
 import {
@@ -123,6 +124,7 @@ export default async function PaymentVouchersPage({ searchParams }: PageProps) {
   const vouchers = voucherHistory.slice(0, 20);
   const pendingVouchers = vouchers.filter((item) => item.status === "pending");
   const nextVoucherNumber = await getNextVoucherNumber();
+  const categories = await getCategoriesWithFallback("voucher");
   const selectedVoucherId = pendingVouchers[0]?.id ?? "";
 
   return (
@@ -173,6 +175,7 @@ export default async function PaymentVouchersPage({ searchParams }: PageProps) {
               ) : null}
 
               <VoucherFormFields
+                categories={categories}
                 voucherNumber={
                   isEditing
                     ? (editDocument?.voucherNumber ?? "")

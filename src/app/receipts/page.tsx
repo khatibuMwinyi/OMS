@@ -11,6 +11,7 @@ import {
   listReceipts,
 } from "@/lib/records";
 import { normalizeReportPeriod } from "@/lib/report-period";
+import { getCategoriesWithFallback } from "@/lib/categories";
 import { getCurrentSession } from "@/lib/session-server";
 
 function formatTZS(value: number) {
@@ -69,6 +70,8 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
     ? editDocument?.receiptNumber ?? ""
     : await getNextReceiptNumber();
 
+  const categories = await getCategoriesWithFallback("receipt");
+
   const receiptHistory = await listReceipts(
     session,
     1000,
@@ -123,6 +126,7 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
               isEditing={isEditing}
               nextReceiptNumber={nextReceiptNumber}
               document={editDocument}
+              categories={categories}
             />
           </section>
 

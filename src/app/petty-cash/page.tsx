@@ -7,9 +7,10 @@ import { ReportPeriodTabs } from "@/components/report-period-tabs";
 import { RouteToast } from "@/components/route-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { legacyPettyCashRecords } from "@/lib/legacy-form-data";
+import { legacyPettyCashRecords, type LegacySelectionRecord } from "@/lib/legacy-form-data";
 import { getNextPettyCashNumber, listPettyCash } from "@/lib/records";
 import { normalizeReportPeriod } from "@/lib/report-period";
+import { getCategoriesWithFallback } from "@/lib/categories";
 import { getCurrentSession } from "@/lib/session-server";
 
 import { createPettyCashAction } from "../actions/records";
@@ -52,6 +53,14 @@ export default async function PettyCashPage({ searchParams }: PageProps) {
   };
 
   const nextPettyCashNumber = await getNextPettyCashNumber();
+  const categories = await getCategoriesWithFallback("petty_cash");
+  const pettyCashRecords: LegacySelectionRecord[] = categories.map(cat => ({
+    type: cat.type || "Expense",
+    category: cat.category,
+    code: cat.code,
+    description: cat.description || "",
+  }));
+
   const pettyCashHistory = await listPettyCash(
     session,
     1000,
@@ -99,7 +108,7 @@ export default async function PettyCashPage({ searchParams }: PageProps) {
                 <Input name="date" type="date" required />
               </label>
               <LegacySelectionFields
-                records={legacyPettyCashRecords}
+                records={pettyCashRecords}
                 defaultType="Expense"
                 showAmount={false}
               />
