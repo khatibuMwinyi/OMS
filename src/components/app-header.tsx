@@ -13,6 +13,7 @@ import {
   X,
   Wallet,
   UsersRound,
+  Tags,
 } from "lucide-react";
 
 import { logoutAction } from "@/app/actions/auth";
@@ -30,6 +31,11 @@ const navigation = [
   { href: "/letters", label: "Letters", icon: FileText },
 ];
 
+const adminNavigation = [
+  { href: "/admin/users", label: "User Management", icon: UsersRound },
+  { href: "/admin/categories", label: "Categories", icon: Tags },
+];
+
 type AppHeaderProps = {
   session: SessionUser;
   activeHref: string;
@@ -40,9 +46,7 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
   const pathname = usePathname();
   const navigationItems = [
     ...navigation,
-    ...(session.role === "admin"
-      ? [{ href: "/admin/users", label: "User Management", icon: UsersRound }]
-      : []),
+    ...(session.role === "admin" ? adminNavigation : []),
   ];
 
   useEffect(() => {
