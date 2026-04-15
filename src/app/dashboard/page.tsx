@@ -128,11 +128,11 @@ export default async function DashboardPage() {
           <span className="eyebrow">System overview</span>
           <h1 className="page-title">Dashboard</h1>
           <p className="subtle-copy">
-            {overview.scopeLabel} are shown below. View all system records and
-            activities.
+            {overview.scopeLabel} are shown below. View all system records and activities.
           </p>
         </section>
 
+        {/* Responsive summary grid */}
         <section className="summary-grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3">
           {overview.summary.map((item) => (
             <StatCard
@@ -145,9 +145,10 @@ export default async function DashboardPage() {
           ))}
         </section>
 
+        {/* Responsive section grid for modules */}
         <section className="section-grid">
-          <div style={{ gridColumn: "span 12" }}>
-            <div className="section-head">
+          <div className="col-span-full w-full min-w-0">
+            <div className="section-head flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <span className="eyebrow">Recent records</span>
                 <h2 className="section-title">Latest database entries</h2>
@@ -158,7 +159,7 @@ export default async function DashboardPage() {
               </span>
             </div>
 
-            <div className="recent-records-stack space-y-4">
+            <div className="recent-records-stack flex flex-col gap-3 sm:gap-4">
               <DashboardModuleToggle
                 modules={[
                   { key: "invoices", label: "Invoices" },

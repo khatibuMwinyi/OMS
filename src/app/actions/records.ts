@@ -809,7 +809,7 @@ export async function createVoucherAction(formData: FormData) {
       account_name, bank_reference, mobile_number, payer_name, mobile_reference,
       code, type, category, description, amount, status, admin_comment,
       approved_by, approved_at, rejected_by, rejected_at, user_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
     [
       parsed.data.voucher_number,
       parsed.data.date,
