@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 import { SESSION_IDLE_TIMEOUT_MS } from "./session-config";
 
-export type UserRole = "admin" | "secretary";
+export type UserRole = "admin" | "secretary" | "director";
 
 export type SessionUser = {
   userId: number;

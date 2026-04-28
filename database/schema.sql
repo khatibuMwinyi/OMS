@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(100) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
-  role ENUM('admin', 'secretary') NOT NULL DEFAULT 'secretary',
+  role ENUM('admin', 'secretary', 'director') NOT NULL DEFAULT 'secretary',
   signature_image_path VARCHAR(500),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -86,10 +86,17 @@ CREATE TABLE IF NOT EXISTS petty_cash_transactions (
   amount DECIMAL(10,2) NOT NULL,
   pettycash_number VARCHAR(50),
   reference_number VARCHAR(255),
+  status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+  approved_by INT,
+  approved_at TIMESTAMP NULL,
+  rejected_by INT,
+  rejected_at TIMESTAMP NULL,
   user_id INT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_petty_cash_user_created (user_id, created_at),
-  FOREIGN KEY (user_id) REFERENCES users(id)
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (approved_by) REFERENCES users(id),
+  FOREIGN KEY (rejected_by) REFERENCES users(id)
 );
 
 CREATE TABLE IF NOT EXISTS payment_vouchers (
@@ -232,3 +239,4 @@ CREATE TABLE IF NOT EXISTS petty_cash_config (
 
 INSERT IGNORE INTO users (username, password, role) VALUES ('admin', 'admin123', 'admin');
 INSERT IGNORE INTO users (username, password, role) VALUES ('secretary', '1234', 'secretary');
+INSERT IGNORE INTO users (username, password, role) VALUES ('director', 'director123', 'director');

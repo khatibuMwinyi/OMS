@@ -4,7 +4,7 @@ import { ensureDocumentWorkflowColumns } from "./records";
 export type UserRecord = {
   id: number;
   username: string;
-  role: "admin" | "secretary";
+  role: "admin" | "secretary" | "director";
   signatureImagePath: string | null;
   createdAt: string;
 };

@@ -79,6 +79,36 @@ function renderLetterStatus(status: "pending" | "approved") {
   );
 }
 
+function renderPettyCashStatus(status: string) {
+  const normalizedStatus = status.toLowerCase();
+  if (normalizedStatus === "pending") {
+    return (
+      <Badge variant="warning" className="px-2 py-0.5 text-[10px]">
+        Pending
+      </Badge>
+    );
+  }
+  if (normalizedStatus === "approved") {
+    return (
+      <Badge variant="success" className="px-2 py-0.5 text-[10px]">
+        Approved
+      </Badge>
+    );
+  }
+  if (normalizedStatus === "rejected") {
+    return (
+      <Badge variant="destructive" className="px-2 py-0.5 text-[10px]">
+        Rejected
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="secondary" className="px-2 py-0.5 text-[10px]">
+      {status}
+    </Badge>
+  );
+}
+
 const summaryIcons = {
   Invoices: ClipboardList,
   Receipts: Receipt,
@@ -287,7 +317,17 @@ export default async function DashboardPage() {
                         item.code ||
                         item.referenceNumber ||
                         item.description,
-                      subtitle: `${item.description} · ${item.category} · ${formatDate(item.date)}`,
+                      subtitle: (
+                        <span className="inline-flex flex-wrap items-center gap-2">
+                          <span>{item.description}</span>
+                          <span aria-hidden="true">&middot;</span>
+                          <span>{item.category}</span>
+                          <span aria-hidden="true">&middot;</span>
+                          {renderPettyCashStatus(item.status)}
+                          <span aria-hidden="true">&middot;</span>
+                          <span>{formatDate(item.date)}</span>
+                        </span>
+                      ),
                       value: formatTZS(Number(item.amount ?? 0)),
                     }))}
                   />

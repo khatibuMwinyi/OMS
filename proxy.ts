@@ -46,12 +46,20 @@ export default function proxy(request: NextRequest) {
     pathname.startsWith("/petty-cash") ||
     pathname.startsWith("/payment-vouchers") ||
     pathname.startsWith("/letters") ||
-    pathname.startsWith("/admin")
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/approvals")
   ) {
     if (!session) {
       return NextResponse.redirect(new URL("/", request.url));
     }
     if (pathname.startsWith("/admin") && session.role !== "admin") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    if (
+      pathname.startsWith("/approvals") &&
+      session.role !== "admin" &&
+      session.role !== "director"
+    ) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
     return refreshSessionCookie(NextResponse.next(), request, session);
@@ -70,5 +78,6 @@ export const config = {
     "/payment-vouchers/:path*",
     "/letters/:path*",
     "/admin/:path*",
+    "/approvals/:path*",
   ],
 };

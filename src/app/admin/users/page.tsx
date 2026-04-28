@@ -79,6 +79,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                 <Select name="role" defaultValue="secretary">
                   <option value="secretary">Secretary</option>
                   <option value="admin">Admin</option>
+                  <option value="director">Director</option>
                 </Select>
               </label>
               <label className="space-y-2 lg:col-span-2">

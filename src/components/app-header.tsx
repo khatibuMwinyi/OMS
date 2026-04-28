@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BadgeCheck,
   ClipboardList,
   FileText,
   LayoutDashboard,
@@ -36,6 +37,10 @@ const adminNavigation = [
   { href: "/admin/categories", label: "Categories", icon: Tags },
 ];
 
+const directorNavigation = [
+  { href: "/approvals", label: "Approvals", icon: BadgeCheck },
+];
+
 type AppHeaderProps = {
   session: SessionUser;
   activeHref: string;
@@ -47,6 +52,7 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
   const navigationItems = [
     ...navigation,
     ...(session.role === "admin" ? adminNavigation : []),
+    ...(session.role === "director" ? directorNavigation : []),
   ];
 
   useEffect(() => {

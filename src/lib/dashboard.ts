@@ -4,6 +4,7 @@ import { queryRows } from "./db";
 import {
   ensureDocumentWorkflowColumns,
   ensureLetterWorkflowColumns,
+  ensurePettyCashStatusColumns,
 } from "./records";
 import type { SessionUser, UserRole } from "./session";
 
@@ -59,6 +60,7 @@ export type RecentPettyCash = RowDataPacket & {
   description: string;
   category: string;
   amount: number;
+  status: "pending" | "approved" | "rejected";
 };
 
 export type RecentVoucher = RowDataPacket & {
@@ -106,6 +108,7 @@ export async function getDashboardOverview(
 ): Promise<DashboardOverview> {
   await ensureDocumentWorkflowColumns();
   await ensureLetterWorkflowColumns();
+  await ensurePettyCashStatusColumns();
   const filter = scopeFilter(session);
   const filterClause = filter.clause;
   const filterParams = filter.params;
@@ -179,7 +182,7 @@ export async function getDashboardOverview(
       filterParams,
     ).catch(() => []),
     queryRows<RecentPettyCash>(
-      `SELECT id, date, pettycash_number AS pettycashNumber, code, reference_number AS referenceNumber, description, category, amount FROM petty_cash_transactions${pettyCashClause} ORDER BY created_at DESC LIMIT 5`,
+      `SELECT id, date, pettycash_number AS pettycashNumber, code, reference_number AS referenceNumber, description, category, amount, status FROM petty_cash_transactions${pettyCashClause} ORDER BY created_at DESC LIMIT 5`,
       pettyCashParams,
     ).catch(() => []),
     queryRows<RecentVoucher>(

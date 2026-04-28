@@ -78,6 +78,11 @@ export type PettyCashRecord = {
   amount: number;
   pettycashNumber: string | null;
   referenceNumber: string | null;
+  status: "pending" | "approved" | "rejected";
+  approvedBy: number | null;
+  approvedAt: string | null;
+  rejectedBy: number | null;
+  rejectedAt: string | null;
   userId: number;
   createdAt: string;
 };
@@ -154,6 +159,7 @@ function scope(_session: SessionUser): Scope {
 let printedLettersTableReady: Promise<void> | null = null;
 let incomingLettersTableReady: Promise<void> | null = null;
 let documentWorkflowColumnsReady: Promise<void> | null = null;
+let pettyCashStatusColumnsReady: Promise<void> | null = null;
 
 export function ensureDocumentWorkflowColumns() {
   if (!documentWorkflowColumnsReady) {
@@ -284,6 +290,42 @@ function ensurePrintedLettersTable() {
 
 export function ensureLetterWorkflowColumns() {
   return ensurePrintedLettersTable();
+}
+
+export function ensurePettyCashStatusColumns() {
+  if (!pettyCashStatusColumnsReady) {
+    pettyCashStatusColumnsReady = execute(`
+      ALTER TABLE petty_cash_transactions
+      ADD COLUMN IF NOT EXISTS status ENUM('pending', 'approved', 'rejected') NOT NULL DEFAULT 'pending'
+    `)
+      .then(() =>
+        execute(`
+          ALTER TABLE petty_cash_transactions
+          ADD COLUMN IF NOT EXISTS approved_by INT NULL
+        `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE petty_cash_transactions
+          ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP NULL
+        `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE petty_cash_transactions
+          ADD COLUMN IF NOT EXISTS rejected_by INT NULL
+        `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE petty_cash_transactions
+          ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMP NULL
+        `),
+      )
+      .then(() => undefined);
+  }
+
+  return pettyCashStatusColumnsReady;
 }
 
 function ensureIncomingLettersTable() {
@@ -630,6 +672,7 @@ export async function listPettyCash(
   period: ReportPeriod = "all",
   context?: ReportPeriodContext,
 ) {
+  await ensurePettyCashStatusColumns();
   const filter = scope(session);
   const periodFilter = buildReportPeriodScope("date", period, context);
   return queryRows<PettyCashRecord>(
@@ -642,6 +685,11 @@ export async function listPettyCash(
       amount,
       pettycash_number AS pettycashNumber,
       reference_number AS referenceNumber,
+      status,
+      approved_by AS approvedBy,
+      approved_at AS approvedAt,
+      rejected_by AS rejectedBy,
+      rejected_at AS rejectedAt,
       user_id AS userId,
       created_at AS createdAt
      FROM petty_cash_transactions${filter.clause}${periodFilter.clause}
@@ -892,6 +940,7 @@ export async function getPettyCashDocument(
   session: SessionUser,
   pettyCashId: number,
 ) {
+  await ensurePettyCashStatusColumns();
   return firstOrNull<PettyCashRecord>(
     `SELECT id,
       date,
@@ -902,6 +951,11 @@ export async function getPettyCashDocument(
       amount,
       pettycash_number AS pettycashNumber,
       reference_number AS referenceNumber,
+      status,
+      approved_by AS approvedBy,
+      approved_at AS approvedAt,
+      rejected_by AS rejectedBy,
+      rejected_at AS rejectedAt,
       user_id AS userId,
       created_at AS createdAt
      FROM petty_cash_transactions

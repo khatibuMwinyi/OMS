@@ -5,6 +5,7 @@ import { LegacySelectionFields } from "@/components/legacy-selection-fields";
 import { RecentRecords } from "@/components/recent-records";
 import { ReportPeriodTabs } from "@/components/report-period-tabs";
 import { RouteToast } from "@/components/route-toast";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { legacyPettyCashRecords, type LegacySelectionRecord } from "@/lib/legacy-form-data";
@@ -25,6 +26,36 @@ function formatDate(value: string) {
     month: "short",
     year: "numeric",
   }).format(new Date(value));
+}
+
+function renderPettyCashStatus(status: string) {
+  const normalizedStatus = status.toLowerCase();
+  if (normalizedStatus === "pending") {
+    return (
+      <Badge variant="warning" className="px-2 py-0.5 text-[10px]">
+        Pending
+      </Badge>
+    );
+  }
+  if (normalizedStatus === "approved") {
+    return (
+      <Badge variant="success" className="px-2 py-0.5 text-[10px]">
+        Approved
+      </Badge>
+    );
+  }
+  if (normalizedStatus === "rejected") {
+    return (
+      <Badge variant="destructive" className="px-2 py-0.5 text-[10px]">
+        Rejected
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="secondary" className="px-2 py-0.5 text-[10px]">
+      {status}
+    </Badge>
+  );
 }
 
 type PageProps = {
@@ -171,7 +202,17 @@ export default async function PettyCashPage({ searchParams }: PageProps) {
               items={pettyCash.map((item) => ({
                 id: item.id,
                 title: item.code || item.referenceNumber || item.description,
-                subtitle: `${item.description} · ${item.category} · ${formatDate(item.date)}`,
+                subtitle: (
+                  <span className="inline-flex flex-wrap items-center gap-2">
+                    <span>{item.description}</span>
+                    <span aria-hidden="true">&middot;</span>
+                    <span>{item.category}</span>
+                    <span aria-hidden="true">&middot;</span>
+                    {renderPettyCashStatus(item.status)}
+                    <span aria-hidden="true">&middot;</span>
+                    <span>{formatDate(item.date)}</span>
+                  </span>
+                ),
                 value: formatTZS(Number(item.amount ?? 0)),
               }))}
             />

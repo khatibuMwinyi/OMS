@@ -987,11 +987,11 @@ const voucherStatusSchema = z.object({
 
 export async function updateVoucherStatusAction(formData: FormData) {
   const session = await requireSession();
-  if (session.role !== "admin") {
+  if (session.role !== "admin" && session.role !== "director") {
     goWithMessage(
       "/payment-vouchers",
       "error",
-      "Only admins can approve vouchers.",
+      "Only admins and directors can approve vouchers.",
     );
   }
 
@@ -1132,8 +1132,8 @@ const letterApprovalSchema = z.object({
 export async function approveLetterAction(formData: FormData) {
   const session = await requireSession();
   await ensureDocumentWorkflowColumns();
-  if (session.role !== "admin") {
-    goWithMessage("/letters", "error", "Only admins can approve letters.");
+  if (session.role !== "admin" && session.role !== "director") {
+    goWithMessage("/letters", "error", "Only admins and directors can approve letters.");
   }
 
   const parsed = letterApprovalSchema.safeParse({
@@ -1367,4 +1367,74 @@ export async function createIncomingLetterAction(formData: FormData) {
 
   revalidatePath("/letters");
   goWithMessage("/letters", "status", "Incoming letter recorded successfully.");
+}
+
+const pettyCashStatusSchema = z.object({
+  petty_cash_id: z.coerce.number().int().positive(),
+  status: z.enum(["approved", "rejected"]),
+  comment: z.string().trim().optional(),
+});
+
+export async function updatePettyCashStatusAction(formData: FormData) {
+  const session = await requireSession();
+
+  if (session.role !== "admin" && session.role !== "director") {
+    goWithMessage(
+      "/approvals",
+      "error",
+      "Only admins and directors can approve or reject petty cash records.",
+    );
+  }
+
+  const parsed = pettyCashStatusSchema.safeParse({
+    petty_cash_id: formData.get("petty_cash_id"),
+    status: formData.get("status"),
+    comment: formData.get("comment"),
+  });
+
+  if (!parsed.success) {
+    goWithMessage("/approvals", "error", "Invalid petty cash status update.");
+  }
+
+  const comment = parsed.data.comment?.trim() ?? "";
+  if (parsed.data.status === "rejected" && !comment) {
+    goWithMessage(
+      "/approvals",
+      "error",
+      "Provide a comment when rejecting a petty cash record.",
+    );
+  }
+
+  const now = new Date().toISOString().slice(0, 19).replace("T", " ");
+
+  if (parsed.data.status === "approved") {
+    await execute(
+      `UPDATE petty_cash_transactions
+       SET status = 'approved',
+           approved_by = ?, approved_at = ?,
+           rejected_by = NULL, rejected_at = NULL
+       WHERE id = ?`,
+      [session.userId, now, parsed.data.petty_cash_id],
+    );
+  } else {
+    await execute(
+      `UPDATE petty_cash_transactions
+       SET status = 'rejected',
+           rejected_by = ?, rejected_at = ?,
+           approved_by = NULL, approved_at = NULL
+       WHERE id = ?`,
+      [session.userId, now, parsed.data.petty_cash_id],
+    );
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/approvals");
+  revalidatePath("/petty-cash");
+  goWithMessage(
+    "/approvals",
+    "status",
+    parsed.data.status === "approved"
+      ? "Petty cash record approved."
+      : "Petty cash record rejected.",
+  );
 }

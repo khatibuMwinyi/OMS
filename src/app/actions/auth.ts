@@ -25,7 +25,7 @@ type LoginUserRow = {
   id: number;
   username: string;
   password: string;
-  role: "admin" | "secretary";
+  role: "admin" | "secretary" | "director";
 };
 
 export type LoginState = {
@@ -121,7 +121,7 @@ export async function logoutAction() {
 const createUserSchema = z.object({
   username: z.string().trim().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
-  role: z.enum(["admin", "secretary"]),
+  role: z.enum(["admin", "secretary", "director"]),
   signature_image_path: z.string().trim().optional(),
 });
 
