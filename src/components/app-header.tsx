@@ -5,16 +5,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BadgeCheck,
-  ClipboardList,
-  FileText,
+  BarChart2,
   LayoutDashboard,
   Menu,
-  Receipt,
-  X,
-  Wallet,
-  UsersRound,
   Tags,
+  UsersRound,
+  X,
 } from "lucide-react";
 
 import { logoutAction } from "@/app/actions/auth";
@@ -25,20 +21,12 @@ import type { SessionUser } from "@/lib/session";
 
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/invoices", label: "Invoices", icon: ClipboardList },
-  { href: "/receipts", label: "Receipts", icon: Receipt },
-  { href: "/petty-cash", label: "Petty Cash Voucher", icon: Wallet },
-  { href: "/payment-vouchers", label: "Payment Vouchers", icon: ClipboardList },
-  { href: "/letters", label: "Letters", icon: FileText },
+  { href: "/reports", label: "Reports", icon: BarChart2 },
 ];
 
 const adminNavigation = [
   { href: "/admin/users", label: "User Management", icon: UsersRound },
   { href: "/admin/categories", label: "Categories", icon: Tags },
-];
-
-const directorNavigation = [
-  { href: "/approvals", label: "Approvals", icon: BadgeCheck },
 ];
 
 type AppHeaderProps = {
@@ -49,10 +37,10 @@ type AppHeaderProps = {
 export function AppHeader({ session, activeHref }: AppHeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+
   const navigationItems = [
     ...navigation,
     ...(session.role === "admin" ? adminNavigation : []),
-    ...(session.role === "director" ? directorNavigation : []),
   ];
 
   useEffect(() => {
@@ -91,7 +79,7 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
 
   const navigationLinks = navigationItems.map((item) => {
     const Icon = item.icon;
-    const active = activeHref === item.href;
+    const active = activeHref === item.href || activeHref.startsWith(item.href + "/");
     return (
       <Link
         key={item.href}
@@ -109,6 +97,7 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
     <>
       <SessionActivityMonitor />
 
+      {/* Mobile top bar */}
       <header className="mobile-topbar lg:hidden">
         <div className="dashboard-brand">
           <Image
@@ -137,6 +126,7 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
         </button>
       </header>
 
+      {/* Mobile backdrop */}
       <button
         type="button"
         className={`sidebar-backdrop lg:hidden${isMobileMenuOpen ? " is-open" : ""}`}
@@ -146,6 +136,7 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
         onClick={closeMobileMenu}
       />
 
+      {/* Mobile sidebar */}
       <aside
         id="mobile-navigation"
         className={`mobile-sidebar lg:hidden${isMobileMenuOpen ? " is-open" : ""}`}
@@ -194,6 +185,7 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
         </div>
       </aside>
 
+      {/* Desktop sidebar */}
       <aside className="desktop-sidebar hidden lg:flex" aria-label="Primary">
         <div className="sidebar-brand">
           <Image
