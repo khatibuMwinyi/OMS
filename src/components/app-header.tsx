@@ -6,10 +6,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart2,
+  ChevronDown,
+  ClipboardList,
+  FileText,
+  FileEdit,
+  Folder,
   LayoutDashboard,
   Menu,
+  Receipt,
   Tags,
   UsersRound,
+  Wallet,
   X,
 } from "lucide-react";
 
@@ -21,12 +28,30 @@ import type { SessionUser } from "@/lib/session";
 
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+];
+
+const reportNavigation = [
   { href: "/reports", label: "Reports", icon: BarChart2 },
+];
+
+const staffNavigation = [
+  { href: "/payment-vouchers", label: "Payment Vouchers", icon: FileEdit },
+  { href: "/invoices", label: "Invoices", icon: ClipboardList },
+  { href: "/letters", label: "Letters", icon: FileText },
+  { href: "/receipts", label: "Receipts", icon: Receipt },
+  { href: "/petty-cash", label: "Petty Cash Voucher", icon: Wallet },
 ];
 
 const adminNavigation = [
   { href: "/admin/users", label: "User Management", icon: UsersRound },
   { href: "/admin/categories", label: "Categories", icon: Tags },
+];
+
+const projectCategories = [
+  { href: "/projects/land", label: "Land Project" },
+  { href: "/projects/mjengo", label: "Mjengo Challenge" },
+  { href: "/projects/rental", label: "Rental Project" },
+  { href: "/projects/property-management", label: "Property Management" },
 ];
 
 type AppHeaderProps = {
@@ -36,12 +61,22 @@ type AppHeaderProps = {
 
 export function AppHeader({ session, activeHref }: AppHeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [projectsOpen, setProjectsOpen] = useState(false);
   const pathname = usePathname();
 
   const navigationItems = [
     ...navigation,
+    ...(session.role === "admin" || session.role === "director" ? reportNavigation : []),
+    ...(session.role === "admin" || session.role === "secretary" ? staffNavigation : []),
     ...(session.role === "admin" ? adminNavigation : []),
   ];
+
+  // Auto-expand projects dropdown when navigating to any /projects/* page
+  useEffect(() => {
+    if (pathname.startsWith("/projects")) {
+      setProjectsOpen(true);
+    }
+  }, [pathname]);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -92,6 +127,61 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
       </Link>
     );
   });
+
+  // Projects dropdown — visible to director and admin only
+  const onProjectsPage = pathname.startsWith("/projects");
+  const showProjects = session.role === "director" || session.role === "admin";
+
+  const projectsDropdown = showProjects ? (
+    <div>
+      <button
+        type="button"
+        onClick={() => setProjectsOpen((o) => !o)}
+        className={`sidebar-link w-full text-left${onProjectsPage ? " is-active" : ""}`}
+      >
+        <Folder size={16} />
+        <span className="flex-1">Projects</span>
+        <ChevronDown
+          size={14}
+          className="shrink-0 transition-transform duration-200"
+          style={{ transform: projectsOpen ? "rotate(-180deg)" : "rotate(0deg)" }}
+        />
+      </button>
+
+      <div
+        className="overflow-hidden transition-all duration-200"
+        style={{ maxHeight: projectsOpen ? "14rem" : "0px" }}
+      >
+        <nav className="mt-1 grid gap-1 pl-4">
+          {projectCategories.map((cat) => {
+            const active =
+              pathname === cat.href || pathname.startsWith(cat.href + "/");
+            return (
+              <Link
+                key={cat.href}
+                href={cat.href}
+                onClick={closeMobileMenu}
+                className={`sidebar-link py-2 text-sm${active ? " is-active" : ""}`}
+              >
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-current opacity-70"
+                  aria-hidden
+                />
+                {cat.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+    </div>
+  ) : null;
+
+  const allNavContent = (
+    <>
+      {navigationLinks}
+      {projectsDropdown}
+    </>
+  );
 
   return (
     <>
@@ -168,7 +258,7 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
           </button>
         </div>
 
-        <nav className="sidebar-nav">{navigationLinks}</nav>
+        <nav className="sidebar-nav">{allNavContent}</nav>
 
         <div className="sidebar-footer sidebar-footer--mobile">
           <Badge variant="warning">{session.role.toUpperCase()} ACCESS</Badge>
@@ -206,7 +296,7 @@ export function AppHeader({ session, activeHref }: AppHeaderProps) {
           <Badge variant="warning" className="w-fit">
             {session.role.toUpperCase()} ACCESS
           </Badge>
-          <nav className="sidebar-nav">{navigationLinks}</nav>
+          <nav className="sidebar-nav">{allNavContent}</nav>
         </div>
 
         <div className="sidebar-footer">
