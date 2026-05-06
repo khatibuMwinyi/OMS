@@ -3,3 +3,4 @@
 .next/
 tsconfig.tsbuildinfo
 .claude/
+public/uploads/
