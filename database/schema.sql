@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   mobile_number VARCHAR(255),
   mobile_holder VARCHAR(255),
   mobile_operator VARCHAR(255),
+  depositor_name VARCHAR(255),
   subtotal DECIMAL(10,2) NOT NULL,
   vat DECIMAL(10,2) NOT NULL,
   discount DECIMAL(10,2) NOT NULL,
@@ -42,7 +43,9 @@ CREATE TABLE IF NOT EXISTS invoices (
 CREATE TABLE IF NOT EXISTS invoice_items (
   id INT AUTO_INCREMENT PRIMARY KEY,
   invoice_id INT NOT NULL,
+  category VARCHAR(100),
   description VARCHAR(255) NOT NULL,
+  location VARCHAR(255),
   quantity INT NOT NULL,
   unit_price DECIMAL(10,2) NOT NULL,
   total DECIMAL(10,2) NOT NULL,
@@ -65,7 +68,9 @@ CREATE TABLE IF NOT EXISTS receipts (
   bank_name VARCHAR(255),
   branch_name VARCHAR(255),
   reference_number VARCHAR(255),
+  depositor_name VARCHAR(255),
   receipt_date DATE NOT NULL,
+  receipt_file_path VARCHAR(500),
   sent_at TIMESTAMP NULL,
   sent_by INT,
   sent_via ENUM('whatsapp', 'email'),
@@ -74,6 +79,20 @@ CREATE TABLE IF NOT EXISTS receipts (
   KEY idx_receipts_user_created (user_id, created_at),
   FOREIGN KEY (user_id) REFERENCES users(id),
   FOREIGN KEY (sent_by) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS receipt_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  receipt_id INT NOT NULL,
+  category VARCHAR(100),
+  description VARCHAR(255) NOT NULL,
+  location VARCHAR(255),
+  quantity INT NOT NULL,
+  unit_price DECIMAL(10,2) NOT NULL,
+  total DECIMAL(10,2) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_receipt_items_receipt (receipt_id),
+  FOREIGN KEY (receipt_id) REFERENCES receipts(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS petty_cash_transactions (
@@ -112,6 +131,7 @@ CREATE TABLE IF NOT EXISTS payment_vouchers (
   mobile_number VARCHAR(255),
   payer_name VARCHAR(255),
   mobile_reference VARCHAR(255),
+  depositor_name VARCHAR(255),
   code VARCHAR(100),
   type VARCHAR(100),
   category VARCHAR(100) NOT NULL,
@@ -170,6 +190,7 @@ CREATE TABLE IF NOT EXISTS letter_content (
   receiver_address TEXT,
   heading VARCHAR(500),
   body TEXT,
+  language ENUM('en','sw') NOT NULL DEFAULT 'en',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_letter_content_letter (letter_id),

@@ -27,6 +27,7 @@ export type InvoiceRecord = {
   mobileNumber: string | null;
   mobileHolder: string | null;
   mobileOperator: string | null;
+  depositorName: string | null;
   subtotal: number;
   vat: number;
   discount: number;
@@ -40,7 +41,19 @@ export type InvoiceRecord = {
 
 export type InvoiceItemRecord = {
   id: number;
+  category: string | null;
   description: string;
+  location: string | null;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+};
+
+export type ReceiptItemRecord = {
+  id: number;
+  category: string | null;
+  description: string;
+  location: string | null;
   quantity: number;
   unitPrice: number;
   total: number;
@@ -60,7 +73,9 @@ export type ReceiptRecord = {
   bankName: string | null;
   branchName: string | null;
   referenceNumber: string | null;
+  depositorName: string | null;
   receiptDate: string;
+  receiptFilePath: string | null;
   sentAt: string | null;
   sentBy: number | null;
   sentVia: SendChannel | null;
@@ -100,6 +115,7 @@ export type VoucherRecord = {
   mobileNumber: string | null;
   payerName: string | null;
   mobileReference: string | null;
+  depositorName: string | null;
   code: string | null;
   type: string | null;
   category: string;
@@ -125,6 +141,7 @@ export type LetterRecord = {
   receiverAddress: string | null;
   heading: string | null;
   body: string | null;
+  language: "en" | "sw";
   status: "pending" | "approved";
   approvedBy: number | null;
   approvedAt: string | null;
@@ -169,6 +186,12 @@ export function ensureDocumentWorkflowColumns() {
     `)
       .then(() =>
         execute(`
+          ALTER TABLE users
+          MODIFY COLUMN role ENUM('admin','secretary','director') NOT NULL DEFAULT 'secretary'
+        `).catch(() => undefined),
+      )
+      .then(() =>
+        execute(`
           ALTER TABLE invoices
           ADD COLUMN IF NOT EXISTS sent_at TIMESTAMP NULL
         `),
@@ -202,6 +225,59 @@ export function ensureDocumentWorkflowColumns() {
           ALTER TABLE receipts
           ADD COLUMN IF NOT EXISTS sent_via ENUM('whatsapp', 'email') NULL
         `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE invoice_items
+          ADD COLUMN IF NOT EXISTS category VARCHAR(100) NULL
+        `).catch(() => undefined),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE invoice_items
+          ADD COLUMN IF NOT EXISTS location VARCHAR(255) NULL
+        `).catch(() => undefined),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE receipts
+          ADD COLUMN IF NOT EXISTS depositor_name VARCHAR(255) NULL
+        `).catch(() => undefined),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE receipts
+          ADD COLUMN IF NOT EXISTS receipt_file_path VARCHAR(500) NULL
+        `).catch(() => undefined),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE invoices
+          ADD COLUMN IF NOT EXISTS depositor_name VARCHAR(255) NULL
+        `).catch(() => undefined),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE payment_vouchers
+          ADD COLUMN IF NOT EXISTS depositor_name VARCHAR(255) NULL
+        `).catch(() => undefined),
+      )
+      .then(() =>
+        execute(`
+          CREATE TABLE IF NOT EXISTS receipt_items (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            receipt_id INT NOT NULL,
+            category VARCHAR(100) NULL,
+            description VARCHAR(255) NOT NULL,
+            location VARCHAR(255) NULL,
+            quantity INT NOT NULL,
+            unit_price DECIMAL(10,2) NOT NULL,
+            total DECIMAL(10,2) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_receipt_items_receipt (receipt_id),
+            FOREIGN KEY (receipt_id) REFERENCES receipts(id) ON DELETE CASCADE
+          )
+        `).catch(() => undefined),
       )
       .then(() => undefined);
   }
@@ -281,6 +357,12 @@ function ensurePrintedLettersTable() {
           ALTER TABLE printed_letters
           ADD COLUMN IF NOT EXISTS sent_via ENUM('whatsapp', 'email') NULL
         `),
+      )
+      .then(() =>
+        execute(`
+          ALTER TABLE letter_content
+          ADD COLUMN IF NOT EXISTS language ENUM('en','sw') NOT NULL DEFAULT 'en'
+        `).catch(() => undefined),
       )
       .then(() => undefined);
   }
@@ -614,6 +696,7 @@ export async function listInvoices(
       mobile_number AS mobileNumber,
       mobile_holder AS mobileHolder,
       mobile_operator AS mobileOperator,
+      depositor_name AS depositorName,
       subtotal,
       vat,
       discount,
@@ -653,6 +736,7 @@ export async function listReceipts(
       bank_name AS bankName,
       branch_name AS branchName,
       reference_number AS referenceNumber,
+      depositor_name AS depositorName,
       receipt_date AS receiptDate,
       sent_at AS sentAt,
       sent_by AS sentBy,
@@ -720,6 +804,7 @@ export async function listVouchers(
       mobile_number AS mobileNumber,
       payer_name AS payerName,
       mobile_reference AS mobileReference,
+      depositor_name AS depositorName,
       code,
       type,
       category,
@@ -761,6 +846,7 @@ export async function listLetters(
       lc.receiver_address AS receiverAddress,
       lc.heading,
       lc.body,
+      COALESCE(lc.language, 'en') AS language,
       pl.status,
       pl.approved_by AS approvedBy,
       pl.approved_at AS approvedAt,
@@ -799,6 +885,7 @@ export async function getInvoiceDocument(
       mobile_number AS mobileNumber,
       mobile_holder AS mobileHolder,
       mobile_operator AS mobileOperator,
+      depositor_name AS depositorName,
       subtotal,
       vat,
       discount,
@@ -819,7 +906,7 @@ export async function getInvoiceDocument(
   }
 
   const items = await queryRows<InvoiceItemRecord>(
-    `SELECT id, description, quantity, unit_price AS unitPrice, total
+    `SELECT id, category, description, location, quantity, unit_price AS unitPrice, total
      FROM invoice_items
      WHERE invoice_id = ?
      ORDER BY id ASC`,
@@ -845,6 +932,7 @@ export async function getInvoiceDocumentPublic(invoiceId: number) {
       mobile_number AS mobileNumber,
       mobile_holder AS mobileHolder,
       mobile_operator AS mobileOperator,
+      depositor_name AS depositorName,
       subtotal,
       vat,
       discount,
@@ -865,7 +953,7 @@ export async function getInvoiceDocumentPublic(invoiceId: number) {
   }
 
   const items = await queryRows<InvoiceItemRecord>(
-    `SELECT id, description, quantity, unit_price AS unitPrice, total
+    `SELECT id, category, description, location, quantity, unit_price AS unitPrice, total
      FROM invoice_items
      WHERE invoice_id = ?
      ORDER BY id ASC`,
@@ -880,7 +968,7 @@ export async function getReceiptDocument(
   receiptId: number,
 ) {
   await ensureDocumentWorkflowColumns();
-  return firstOrNull<ReceiptRecord>(
+  const receipt = await firstOrNull<ReceiptRecord>(
     `SELECT id,
       receipt_number AS receiptNumber,
       customer_name AS customerName,
@@ -894,7 +982,9 @@ export async function getReceiptDocument(
       bank_name AS bankName,
       branch_name AS branchName,
       reference_number AS referenceNumber,
+      depositor_name AS depositorName,
       receipt_date AS receiptDate,
+      receipt_file_path AS receiptFilePath,
       sent_at AS sentAt,
       sent_by AS sentBy,
       sent_via AS sentVia,
@@ -905,11 +995,26 @@ export async function getReceiptDocument(
      LIMIT 1`,
     [receiptId],
   );
+
+  if (!receipt) {
+    return null;
+  }
+
+  const items = await queryRows<ReceiptItemRecord>(
+    `SELECT id, category, description, location, quantity,
+            unit_price AS unitPrice, total
+     FROM receipt_items
+     WHERE receipt_id = ?
+     ORDER BY id ASC`,
+    [receiptId],
+  ).catch(() => []);
+
+  return { receipt, items };
 }
 
 export async function getReceiptDocumentPublic(receiptId: number) {
   await ensureDocumentWorkflowColumns();
-  return firstOrNull<ReceiptRecord>(
+  const receipt = await firstOrNull<ReceiptRecord>(
     `SELECT id,
       receipt_number AS receiptNumber,
       customer_name AS customerName,
@@ -923,7 +1028,9 @@ export async function getReceiptDocumentPublic(receiptId: number) {
       bank_name AS bankName,
       branch_name AS branchName,
       reference_number AS referenceNumber,
+      depositor_name AS depositorName,
       receipt_date AS receiptDate,
+      receipt_file_path AS receiptFilePath,
       sent_at AS sentAt,
       sent_by AS sentBy,
       sent_via AS sentVia,
@@ -934,6 +1041,21 @@ export async function getReceiptDocumentPublic(receiptId: number) {
      LIMIT 1`,
     [receiptId],
   );
+
+  if (!receipt) {
+    return null;
+  }
+
+  const items = await queryRows<ReceiptItemRecord>(
+    `SELECT id, category, description, location, quantity,
+            unit_price AS unitPrice, total
+     FROM receipt_items
+     WHERE receipt_id = ?
+     ORDER BY id ASC`,
+    [receiptId],
+  ).catch(() => []);
+
+  return { receipt, items };
 }
 
 export async function getPettyCashDocument(
@@ -982,6 +1104,7 @@ export async function getVoucherDocument(
       mobile_number AS mobileNumber,
       payer_name AS payerName,
       mobile_reference AS mobileReference,
+      depositor_name AS depositorName,
       code,
       type,
       category,
@@ -1020,6 +1143,7 @@ export async function getLetterDocument(
       lc.receiver_address AS receiverAddress,
       lc.heading,
       lc.body,
+      COALESCE(lc.language, 'en') AS language,
       pl.status,
       pl.approved_by AS approvedBy,
       pl.approved_at AS approvedAt,
@@ -1055,6 +1179,7 @@ export async function getLetterDocumentPublic(letterId: number) {
       lc.receiver_address AS receiverAddress,
       lc.heading,
       lc.body,
+      COALESCE(lc.language, 'en') AS language,
       pl.status,
       pl.approved_by AS approvedBy,
       pl.approved_at AS approvedAt,
