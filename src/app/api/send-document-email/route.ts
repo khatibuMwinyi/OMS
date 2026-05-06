@@ -180,30 +180,30 @@ export async function POST(request: Request) {
       pdfBytes = await buildInvoicePdf(document);
     } else {
       if (type === "receipt") {
-        const document = await getReceiptDocument(session, id);
-        if (!document) {
+        const receiptDoc = await getReceiptDocument(session, id);
+        if (!receiptDoc) {
           return NextResponse.json(
             { error: "Receipt not found." },
             { status: 404 },
           );
         }
 
-      const totalAmount = Number(document.amount ?? 0);
-      const receiptNumber = document.receiptNumber;
+      const totalAmount = Number(receiptDoc.receipt.amount ?? 0);
+      const receiptNumber = receiptDoc.receipt.receiptNumber;
 
       fileName = `receipt-${receiptNumber}.pdf`;
       subject = `Receipt ${receiptNumber}`;
       htmlBody = `
         <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #1f2937;">
           <h2 style="margin: 0 0 12px;">Receipt ${escapeHtml(receiptNumber)}</h2>
-          <p style="margin: 0 0 8px;">Customer: ${escapeHtml(document.customerName)}</p>
-          <p style="margin: 0 0 8px;">Date: ${escapeHtml(formatDate(document.receiptDate))}</p>
+          <p style="margin: 0 0 8px;">Customer: ${escapeHtml(receiptDoc.receipt.customerName)}</p>
+          <p style="margin: 0 0 8px;">Date: ${escapeHtml(formatDate(receiptDoc.receipt.receiptDate))}</p>
           <p style="margin: 0 0 16px;">Amount: ${escapeHtml(formatCurrency(totalAmount))}</p>
           <p style="margin: 0 0 12px;">The receipt PDF is attached to this email.</p>
         </div>
       `;
 
-        pdfBytes = await buildReceiptPdf(document);
+        pdfBytes = await buildReceiptPdf(receiptDoc.receipt, receiptDoc.items);
       } else {
         const document = await getLetterDocument(session, id);
         if (!document) {
@@ -231,7 +231,7 @@ export async function POST(request: Request) {
           </div>
         `;
 
-        pdfBytes = await buildFormalLetterPdf(document);
+        pdfBytes = await buildFormalLetterPdf(document, { includeSignature: true });
       }
     }
     const resendResponse = await sendViaResend(resendApiKey, {

@@ -321,14 +321,14 @@ export async function GET(_request: Request, { params }: RouteParams) {
 
     pdfBytes = await buildInvoicePdf(document);
   } else if (type === "receipt") {
-    const document = isPublicShareAccess
+    const receiptDoc = isPublicShareAccess
       ? await getReceiptDocumentPublic(numericId)
       : await getReceiptDocument(session!, numericId);
-    if (!document) {
+    if (!receiptDoc) {
       return NextResponse.json({ error: "Receipt not found" }, { status: 404 });
     }
 
-    pdfBytes = await buildReceiptPdf(document);
+    pdfBytes = await buildReceiptPdf(receiptDoc.receipt, receiptDoc.items);
   } else if (type === "voucher" || type === "payment-voucher") {
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -356,7 +356,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       );
     }
 
-    pdfBytes = await buildFormalLetterPdf(document);
+    pdfBytes = await buildFormalLetterPdf(document, { includeSignature: isPublicShareAccess });
   } else if (type === "incoming-letter") {
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
