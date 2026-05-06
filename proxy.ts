@@ -8,7 +8,11 @@ import {
   verifySessionToken,
 } from "./src/lib/session";
 
-function refreshSessionCookie(response: NextResponse, request: NextRequest, session: NonNullable<ReturnType<typeof verifySessionToken>>) {
+function refreshSessionCookie(
+  response: NextResponse,
+  request: NextRequest,
+  session: NonNullable<ReturnType<typeof verifySessionToken>>,
+) {
   response.cookies.set(
     SESSION_COOKIE_NAME,
     createSessionToken(session),
@@ -36,6 +40,17 @@ export default function proxy(request: NextRequest) {
   if (pathname.startsWith("/dashboard")) {
     if (!session) {
       return NextResponse.redirect(new URL("/", request.url));
+    }
+    return refreshSessionCookie(NextResponse.next(), request, session);
+  }
+
+  // ── Projects: director + admin only ─────────────────────────────────────────
+  if (pathname.startsWith("/projects")) {
+    if (!session) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    if (session.role !== "director" && session.role !== "admin") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
     return refreshSessionCookie(NextResponse.next(), request, session);
   }
@@ -72,6 +87,7 @@ export const config = {
   matcher: [
     "/",
     "/dashboard/:path*",
+    "/projects/:path*",
     "/invoices/:path*",
     "/receipts/:path*",
     "/petty-cash/:path*",

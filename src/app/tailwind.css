@@ -4,28 +4,29 @@
 
 @layer base {
   :root {
-    --background: 48 44% 97%; /* Creamy white */
-    --foreground: 220 28% 18%; /* Navy text */
-    --card: 48 44% 100%;
-    --card-foreground: 220 28% 18%;
-    --popover: 48 44% 98%;
-    --popover-foreground: 220 28% 18%;
-    --primary: 220 44% 18%; /* Navy */
-    --primary-foreground: 48 44% 97%;
-    --secondary: 45 94% 62%; /* Gold */
-    --secondary-foreground: 220 44% 18%;
-    --muted: 220 18% 60%;
-    --muted-foreground: 220 28% 48%;
-    --accent: 45 94% 62%;
-    --accent-foreground: 220 44% 18%;
-    --surface: 48 44% 100%;
-    --surface-color: #fffbe9;
-    --surface-foreground: 220 28% 18%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 220 44% 18%;
-    --border: 45 94% 82%;
-    --input: 48 44% 97%;
-    --ring: 45 94% 62%;
+    /* Executive Navy palette */
+    --background: 220 36% 9%;          /* #0B1220 deep navy */
+    --foreground: 214 30% 93%;         /* #E5EDF8 near-white */
+    --card: 220 30% 13%;               /* #151F33 surface */
+    --card-foreground: 214 30% 93%;
+    --popover: 220 30% 13%;
+    --popover-foreground: 214 30% 93%;
+    --primary: 217 91% 60%;            /* #3B82F6 steel blue */
+    --primary-foreground: 220 40% 8%;  /* dark on blue */
+    --secondary: 160 84% 39%;          /* #10B981 emerald (positive) */
+    --secondary-foreground: 220 40% 8%;
+    --muted: 217 19% 35%;
+    --muted-foreground: 215 20% 70%;   /* #8A9BB5 */
+    --accent: 38 92% 50%;              /* #F59E0B amber (warning) */
+    --accent-foreground: 220 40% 8%;
+    --surface: 220 30% 13%;
+    --surface-color: #151F33;
+    --surface-foreground: 214 30% 93%;
+    --destructive: 0 84% 60%;          /* #EF4444 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 24% 24%;             /* #2F3A4F */
+    --input: 220 30% 13%;
+    --ring: 217 91% 60%;
     --font-display: "Futura PT", "Poppins", sans-serif;
   }
 
@@ -39,7 +40,10 @@
 
   body {
     @apply min-h-screen bg-background font-body text-foreground antialiased;
-    background: #f9faf7;
+    background:
+      radial-gradient(circle at top left, rgba(59, 130, 246, 0.10), transparent 40%),
+      radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.08), transparent 36%),
+      linear-gradient(180deg, #0B1220 0%, #070D19 100%);
   }
 
   body::before {
@@ -52,7 +56,7 @@
       linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
     background-size: 42px 42px;
     mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.72), transparent 75%);
-    opacity: 0.26;
+    opacity: 0.22;
   }
 
   a {
@@ -115,7 +119,7 @@
     border-radius: 9999px;
     background: radial-gradient(
       circle,
-      rgba(251, 191, 36, 0.22),
+      rgba(59, 130, 246, 0.22),
       transparent 68%
     );
     filter: blur(14px);
@@ -131,8 +135,8 @@
     height: 0.5rem;
     width: 0.5rem;
     border-radius: 9999px;
-    background: hsl(var(--accent));
-    box-shadow: 0 0 0 6px rgba(201, 136, 40, 0.16);
+    background: hsl(var(--primary));
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.16);
   }
 
   .hero-title,
@@ -202,9 +206,9 @@
     background: linear-gradient(
       135deg,
       hsl(var(--primary)),
-      hsl(var(--accent))
+      hsl(var(--secondary))
     );
-    box-shadow: 0 0 0 6px rgba(201, 136, 40, 0.12);
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.14);
   }
 
   .auth-card {
@@ -280,8 +284,9 @@
 
   .button-primary {
     @apply text-primary-foreground shadow-soft hover:-translate-y-0.5 hover:shadow-lift focus:ring-primary/25;
-    background-image: linear-gradient(90deg, #1a2236 0%, #d4a23f 60%, #fffbe9 100%);
+    background-image: linear-gradient(135deg, #2563EB 0%, #3B82F6 55%, #60A5FA 100%);
     border: none;
+    color: #FFFFFF;
   }
 
   .button-secondary {

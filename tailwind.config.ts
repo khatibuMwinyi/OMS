@@ -16,6 +16,15 @@ const config: Config = {
       },
     },
     extend: {
+      opacity: {
+        5: '0.05',
+        8: '0.08',
+        10: '0.1',
+        15: '0.15',
+        20: '0.2',
+        25: '0.25',
+        30: '0.3',
+      },
       fontFamily: {
         body: ["var(--font-body)", "ui-sans-serif", "system-ui"],
         display: ["var(--font-display)", "ui-sans-serif", "system-ui"],
