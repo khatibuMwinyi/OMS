@@ -13,6 +13,7 @@ import {
 import { normalizeReportPeriod } from "@/lib/report-period";
 import { getCategoriesWithFallback } from "@/lib/categories";
 import { getCurrentSession } from "@/lib/session-server";
+import { deleteReceiptAction } from "@/app/actions/records";
 
 function formatTZS(value: number) {
   return `TZS ${new Intl.NumberFormat("en-TZ", { maximumFractionDigits: 0 }).format(value)}`;
@@ -55,19 +56,19 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
   const editId = Number(resolvedSearchParams.edit);
   const isEditing = Number.isFinite(editId) && editId > 0;
 
-  const editDocument = isEditing
+  const editDoc = isEditing
     ? await getReceiptDocument(session, editId)
     : null;
-  if (isEditing && !editDocument) {
+  if (isEditing && !editDoc) {
     redirect("/receipts?error=Receipt%20not%20found.");
   }
 
-  if (isEditing && editDocument?.sentAt) {
+  if (isEditing && editDoc?.receipt.sentAt) {
     redirect("/receipts?error=Sent%20receipts%20cannot%20be%20edited.");
   }
 
   const nextReceiptNumber = isEditing
-    ? editDocument?.receiptNumber ?? ""
+    ? editDoc?.receipt.receiptNumber ?? ""
     : await getNextReceiptNumber();
 
   const categories = await getCategoriesWithFallback("receipt");
@@ -125,7 +126,8 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
             <ReceiptForm
               isEditing={isEditing}
               nextReceiptNumber={nextReceiptNumber}
-              document={editDocument}
+              document={editDoc?.receipt ?? null}
+              initialItems={editDoc?.items ?? []}
               categories={categories}
             />
           </section>
@@ -182,6 +184,9 @@ export default async function ReceiptsPage({ searchParams }: PageProps) {
                 return `/receipts?edit=${item.id}`;
               }}
               getDownloadHref={(item) => `/api/export/receipt/${item.id}`}
+              deleteAction={deleteReceiptAction}
+              canDelete={session.role === "admin" || session.role === "director"}
+              deleteConfirmMessage="Delete this receipt? Attached file will also be removed."
               items={receipts.map((item) => ({
                 id: item.id,
                 title: item.receiptNumber,

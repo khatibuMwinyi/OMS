@@ -17,7 +17,11 @@ import { normalizeReportPeriod } from "@/lib/report-period";
 import { FIXED_TIN_NUMBER } from "@/lib/payment-defaults";
 import { getCurrentSession } from "@/lib/session-server";
 
-import { createInvoiceAction, updateInvoiceAction } from "../actions/records";
+import {
+  createInvoiceAction,
+  deleteInvoiceAction,
+  updateInvoiceAction,
+} from "../actions/records";
 
 function formatTZS(value: number) {
   return `TZS ${new Intl.NumberFormat("en-TZ", { maximumFractionDigits: 0 }).format(value)}`;
@@ -95,7 +99,9 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
 
   const initialRows = editDocument
     ? editDocument.items.map((item) => ({
+        category: item.category ?? null,
         description: item.description,
+        location: item.location ?? null,
         quantity: String(item.quantity),
         unitPrice: String(item.unitPrice),
       }))
@@ -227,6 +233,9 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
                     defaultPaymentMethod={
                       editDocument?.invoice.paymentMethod ?? "Cash"
                     }
+                    defaultDepositorName={
+                      editDocument?.invoice.depositorName ?? ""
+                    }
                   />
                 </div>
               </div>
@@ -302,6 +311,9 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
                 return `/invoices?edit=${item.id}`;
               }}
               getDownloadHref={(item) => `/api/export/invoice/${item.id}`}
+              deleteAction={deleteInvoiceAction}
+              canDelete={session.role === "admin" || session.role === "director"}
+              deleteConfirmMessage="Delete this invoice? This will remove all line items and cannot be undone."
               items={invoices.map((item) => ({
                 id: item.id,
                 title: (item.invoiceNumber || "").replace(/^#?PCV/, "PCN"),

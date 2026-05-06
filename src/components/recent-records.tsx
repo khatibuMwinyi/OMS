@@ -33,6 +33,9 @@ type RecentRecordsProps = {
   getPreviewHref?: (item: RecordItem) => string | null | undefined;
   getDownloadHref?: (item: RecordItem) => string | null | undefined;
   variant?: "card" | "table";
+  deleteAction?: ((formData: FormData) => void | Promise<void>) | null;
+  canDelete?: boolean;
+  deleteConfirmMessage?: string;
 };
 
 async function getRequestOrigin() {
@@ -77,11 +80,15 @@ export async function RecentRecords({
   getPreviewHref,
   getDownloadHref,
   variant = "card",
+  deleteAction,
+  canDelete,
+  deleteConfirmMessage,
 }: RecentRecordsProps) {
   const hasActions =
     typeof getShareDocument === "function" ||
     typeof getEditHref === "function" ||
-    typeof getDownloadHref === "function";
+    typeof getDownloadHref === "function" ||
+    Boolean(canDelete && deleteAction);
   const origin = await getRequestOrigin();
 
   function appendPreviewParam(href: string) {
@@ -182,6 +189,10 @@ export async function RecentRecords({
                             editHref={getEditHref ? getEditHref(item) : null}
                             previewHref={previewHref}
                             downloadHref={downloadHref}
+                            deleteAction={deleteAction ?? null}
+                            deleteId={item.id}
+                            canDelete={Boolean(canDelete && deleteAction)}
+                            deleteConfirmMessage={deleteConfirmMessage}
                           />
                         </td>
                       ) : null}

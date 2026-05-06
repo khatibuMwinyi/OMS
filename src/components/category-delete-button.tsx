@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Pencil, Trash2 } from "lucide-react";
 import { deleteCategoryAction } from "@/app/actions/categories";
 import { Input } from "@/components/ui/input";
 import type { CategoryModule, CategoryRecord } from "@/lib/categories";
@@ -33,10 +34,12 @@ export function CategoryDeleteButton({ categoryId, module }: Props) {
   return (
     <button
       type="button"
-      className="text-sm text-destructive hover:underline"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card/95 text-destructive shadow-sm transition hover:-translate-y-0.5 hover:border-destructive/40 hover:bg-destructive/10"
       onClick={handleDelete}
+      aria-label="Delete category"
+      title="Delete category"
     >
-      Delete
+      <Trash2 size={14} />
     </button>
   );
 }
@@ -108,12 +111,14 @@ export function CategoryFilterTable({
                   <td>{category.type || "-"}</td>
                   <td>{category.description || "-"}</td>
                   <td className="text-right">
-                    <div className="flex flex-wrap justify-end gap-3">
+                    <div className="flex flex-wrap justify-end gap-2">
                       <a
                         href={`${basePath}?edit=${category.id}`}
-                        className="category-action-edit"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card/95 text-foreground/75 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/20 hover:bg-primary/5 hover:text-primary"
+                        aria-label="Edit category"
+                        title="Edit category"
                       >
-                        Edit
+                        <Pencil size={14} />
                       </a>
                       <CategoryDeleteButton
                         categoryId={category.id}

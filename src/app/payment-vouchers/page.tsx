@@ -19,6 +19,7 @@ import { getCurrentSession } from "@/lib/session-server";
 
 import {
   createVoucherAction,
+  deleteVoucherAction,
   updateVoucherAction,
   updateVoucherStatusAction,
 } from "../actions/records";
@@ -191,6 +192,7 @@ export default async function PaymentVouchersPage({ searchParams }: PageProps) {
                 defaultMobileNumber={editDocument?.mobileNumber ?? ""}
                 defaultPayerName={editDocument?.payerName ?? ""}
                 defaultMobileReference={editDocument?.mobileReference ?? ""}
+                defaultDepositorName={editDocument?.depositorName ?? ""}
                 defaultType={editDocument?.type ?? undefined}
                 defaultCategory={editDocument?.category ?? undefined}
                 defaultCode={editDocument?.code ?? undefined}
@@ -260,6 +262,9 @@ export default async function PaymentVouchersPage({ searchParams }: PageProps) {
                   ? `/payment-vouchers?edit=${item.id}`
                   : null;
               }}
+              deleteAction={deleteVoucherAction}
+              canDelete={session.role === "admin" || session.role === "director"}
+              deleteConfirmMessage="Delete this payment voucher? This action cannot be undone."
               items={vouchers.map((item) => ({
                 id: item.id,
                 title: item.voucherNumber,

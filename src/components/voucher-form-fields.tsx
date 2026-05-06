@@ -4,11 +4,15 @@ import { useState } from "react";
 
 import { LegacySelectionFields } from "@/components/legacy-selection-fields";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import {
   legacyVoucherRecords,
   type LegacySelectionRecord,
 } from "@/lib/legacy-form-data";
+import {
+  FIXED_BANK_ACCOUNT_NAME,
+  FIXED_BANK_ACCOUNT_NUMBER,
+  FIXED_BANK_NAME,
+} from "@/lib/payment-defaults";
 import type { CategoryRecord } from "@/lib/categories";
 
 type VoucherFormFieldsProps = {
@@ -25,12 +29,29 @@ type VoucherFormFieldsProps = {
   defaultMobileNumber?: string | null;
   defaultPayerName?: string | null;
   defaultMobileReference?: string | null;
+  defaultDepositorName?: string | null;
   defaultType?: string | null;
   defaultCategory?: string | null;
   defaultCode?: string | null;
   defaultDescription?: string | null;
   defaultAmount?: number | null;
 };
+
+const VOUCHER_PAYMENT_METHODS = [
+  "Cash",
+  "Bank Transfer",
+  "Mobile Transaction",
+  "Bank Deposit",
+] as const;
+type VoucherPaymentMethod = (typeof VOUCHER_PAYMENT_METHODS)[number];
+
+function normalizeVoucherMethod(
+  value: string | null | undefined,
+): VoucherPaymentMethod {
+  return VOUCHER_PAYMENT_METHODS.includes(value as VoucherPaymentMethod)
+    ? (value as VoucherPaymentMethod)
+    : "Cash";
+}
 
 export function VoucherFormFields({
   categories,
@@ -46,18 +67,15 @@ export function VoucherFormFields({
   defaultMobileNumber,
   defaultPayerName,
   defaultMobileReference,
+  defaultDepositorName,
   defaultType,
   defaultCategory,
   defaultCode,
   defaultDescription,
   defaultAmount,
 }: VoucherFormFieldsProps) {
-  const [paymentMethod, setPaymentMethod] = useState(
-    defaultPaymentMethod === "Bank Transfer" ||
-      defaultPaymentMethod === "Mobile Transaction" ||
-      defaultPaymentMethod === "Cash"
-      ? defaultPaymentMethod
-      : "Cash",
+  const [paymentMethod, setPaymentMethod] = useState<VoucherPaymentMethod>(
+    normalizeVoucherMethod(defaultPaymentMethod),
   );
 
   const records: LegacySelectionRecord[] = categories?.map(cat => ({
@@ -102,7 +120,7 @@ export function VoucherFormFields({
       <fieldset className="space-y-3 lg:col-span-2">
         <span className="field-label">Payment method</span>
         <div className="flex flex-wrap gap-4">
-          {["Cash", "Bank Transfer", "Mobile Transaction"].map((method) => (
+          {VOUCHER_PAYMENT_METHODS.map((method) => (
             <label
               className="flex items-center gap-2 text-sm text-foreground/85"
               key={method}
@@ -186,6 +204,46 @@ export function VoucherFormFields({
             <Input
               name="mobile_reference"
               defaultValue={defaultMobileReference ?? ""}
+              required
+            />
+          </label>
+        </div>
+      ) : null}
+
+      {paymentMethod === "Bank Deposit" ? (
+        <div className="lg:col-span-2 grid gap-3 rounded-3xl border border-border bg-white/5 p-4 sm:grid-cols-2">
+          <label className="space-y-2">
+            <span className="field-label">Bank name</span>
+            <Input
+              name="bank_name"
+              defaultValue={FIXED_BANK_NAME}
+              readOnly
+              required
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="field-label">Account number</span>
+            <Input
+              name="account_number"
+              defaultValue={FIXED_BANK_ACCOUNT_NUMBER}
+              readOnly
+              required
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="field-label">Account holder name</span>
+            <Input
+              name="account_name"
+              defaultValue={FIXED_BANK_ACCOUNT_NAME}
+              readOnly
+              required
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="field-label">Depositor name</span>
+            <Input
+              name="depositor_name"
+              defaultValue={defaultDepositorName ?? ""}
               required
             />
           </label>

@@ -23,6 +23,8 @@ import {
   updateLetterAction,
   createIncomingLetterAction,
   approveLetterAction,
+  deleteLetterAction,
+  deleteIncomingLetterAction,
 } from "../actions/records";
 
 function formatDate(value: string) {
@@ -278,6 +280,33 @@ export default async function LettersPage({ searchParams }: PageProps) {
                     required
                   />
                 </RecordFieldRow>
+                <RecordFieldRow
+                  label="Language"
+                  helper="Switches greeting from English to Swahili in the generated PDF."
+                >
+                  <div className="flex flex-wrap gap-4 pt-1">
+                    {[
+                      { value: "en", label: "English" },
+                      { value: "sw", label: "Swahili" },
+                    ].map((option) => (
+                      <label
+                        key={option.value}
+                        className="flex items-center gap-2 text-sm text-foreground/85"
+                      >
+                        <input
+                          className="h-4 w-4 border-slate-300 text-primary focus:ring-primary"
+                          defaultChecked={
+                            (editDocument?.language ?? "en") === option.value
+                          }
+                          name="language"
+                          type="radio"
+                          value={option.value}
+                        />
+                        {option.label}
+                      </label>
+                    ))}
+                  </div>
+                </RecordFieldRow>
               </div>
 
               <div className="overflow-hidden rounded-3xl border border-border bg-card/95">
@@ -379,6 +408,9 @@ export default async function LettersPage({ searchParams }: PageProps) {
                   : null;
               }}
               getDownloadHref={(item) => `/api/export/letter/${item.id}`}
+              deleteAction={deleteLetterAction}
+              canDelete={session.role === "admin" || session.role === "director"}
+              deleteConfirmMessage="Delete this letter? Stored PDF will be removed too."
               items={filteredLetters.map((item) => ({
                 id: item.id,
                 title: item.referenceNumber ?? item.name,
@@ -542,6 +574,9 @@ export default async function LettersPage({ searchParams }: PageProps) {
                     ? `/api/export/incoming-letter/${item.id}`
                     : null
                 }
+                deleteAction={deleteIncomingLetterAction}
+                canDelete={session.role === "admin" || session.role === "director"}
+                deleteConfirmMessage="Delete this incoming letter record? Attached PDF will be removed."
                 items={filteredIncomingLetters.map((item) => ({
                   id: item.id,
                   title: item.referenceNumber ?? item.senderName,

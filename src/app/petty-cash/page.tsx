@@ -14,7 +14,10 @@ import { normalizeReportPeriod } from "@/lib/report-period";
 import { getCategoriesWithFallback } from "@/lib/categories";
 import { getCurrentSession } from "@/lib/session-server";
 
-import { createPettyCashAction } from "../actions/records";
+import {
+  createPettyCashAction,
+  deletePettyCashAction,
+} from "../actions/records";
 
 function formatTZS(value: number) {
   return `TZS ${new Intl.NumberFormat("en-TZ", { maximumFractionDigits: 0 }).format(value)}`;
@@ -199,6 +202,9 @@ export default async function PettyCashPage({ searchParams }: PageProps) {
               getDownloadHref={(item) =>
                 `/api/export/petty-cash-voucher/${item.id}`
               }
+              deleteAction={deletePettyCashAction}
+              canDelete={session.role === "admin" || session.role === "director"}
+              deleteConfirmMessage="Delete this petty cash record? This action cannot be undone."
               items={pettyCash.map((item) => ({
                 id: item.id,
                 title: item.code || item.referenceNumber || item.description,

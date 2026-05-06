@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Download, Eye, Loader2, Mail, Pencil, Share2 } from "lucide-react";
+import { Download, Eye, Loader2, Mail, Pencil, Share2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,10 @@ type RecordActionButtonsProps = {
   editHref?: string | null;
   previewHref?: string | null;
   downloadHref?: string | null;
+  deleteAction?: ((formData: FormData) => void | Promise<void>) | null;
+  deleteId?: number | null;
+  canDelete?: boolean;
+  deleteConfirmMessage?: string;
 };
 
 function actionButtonClassName() {
@@ -79,6 +83,10 @@ export function RecordActionButtons({
   editHref,
   previewHref,
   downloadHref,
+  deleteAction,
+  deleteId,
+  canDelete,
+  deleteConfirmMessage,
 }: RecordActionButtonsProps) {
   const [isSharing, setIsSharing] = useState(false);
   const [isEmailing, setIsEmailing] = useState(false);
@@ -534,7 +542,33 @@ export function RecordActionButtons({
             <Download size={14} />
           )}
         </Button>
-      ) : null}
+        ) : null}
+
+      {canDelete && deleteAction && deleteId ? (
+        <form
+          action={deleteAction}
+          onSubmit={(event) => {
+            const message =
+              deleteConfirmMessage ?? "Delete this record? This action cannot be undone.";
+            if (!window.confirm(message)) {
+              event.preventDefault();
+            }
+          }}
+          className="inline-flex"
+        >
+          <input type="hidden" name="id" value={deleteId} readOnly />
+          <Button
+            type="submit"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-xl border border-border bg-card/95 text-destructive shadow-sm transition hover:-translate-y-0.5 hover:border-destructive/40 hover:bg-destructive/10"
+            aria-label="Delete record"
+            title="Delete record"
+          >
+            <Trash2 size={14} />
+          </Button>
+        </form>
+        ) : null}
       </div>
 
       {emailDialog}
