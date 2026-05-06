@@ -11,7 +11,7 @@ import {
   type LegacySelectionRecord,
 } from "@/lib/legacy-form-data";
 
-type InvoiceRow = {
+type ReceiptRow = {
   id: string;
   category: string;
   description: string;
@@ -20,7 +20,7 @@ type InvoiceRow = {
   unitPrice: string;
 };
 
-type InvoiceItemInput = {
+type ReceiptItemInput = {
   category?: string | null;
   description: string;
   location?: string | null;
@@ -46,7 +46,7 @@ function descriptionsForCategory(category: string) {
   );
 }
 
-function createRow(): InvoiceRow {
+function createRow(): ReceiptRow {
   const category = REVENUE_CATEGORIES[0] ?? "";
   const description = descriptionsForCategory(category)[0] ?? "";
   return {
@@ -72,12 +72,12 @@ function encodeField(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
 }
 
-type InvoiceItemsFieldProps = {
-  initialRows?: InvoiceItemInput[];
+type ReceiptItemsFieldProps = {
+  initialRows?: ReceiptItemInput[];
 };
 
-export function InvoiceItemsField({ initialRows }: InvoiceItemsFieldProps) {
-  const [rows, setRows] = useState<InvoiceRow[]>(() => {
+export function ReceiptItemsField({ initialRows }: ReceiptItemsFieldProps) {
+  const [rows, setRows] = useState<ReceiptRow[]>(() => {
     if (!initialRows?.length) {
       return [createRow()];
     }
@@ -124,7 +124,7 @@ export function InvoiceItemsField({ initialRows }: InvoiceItemsFieldProps) {
 
   const updateRow = (
     id: string,
-    field: keyof Omit<InvoiceRow, "id">,
+    field: keyof Omit<ReceiptRow, "id">,
     value: string,
   ) => {
     setRows((current) =>
@@ -159,11 +159,12 @@ export function InvoiceItemsField({ initialRows }: InvoiceItemsFieldProps) {
 
   return (
     <div className="rounded-2xl border border-border bg-white/5 p-4">
-      <input name="items" type="hidden" value={serializedItems} readOnly />
+      <input name="receipt_items" type="hidden" value={serializedItems} readOnly />
+      <input name="amount" type="hidden" value={String(subtotal)} readOnly />
 
       <div className="flex flex-col gap-3 border-b border-border/85 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <span className="field-label mb-1">Invoice items</span>
+          <span className="field-label mb-1">Receipt items</span>
           <p className="helper-text mt-0">
             Choose a category, then a description, and add a location for each
             row.
@@ -231,11 +232,10 @@ export function InvoiceItemsField({ initialRows }: InvoiceItemsFieldProps) {
 
       <div className="mt-4 flex flex-col gap-3 border-t border-border/85 pt-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
-          Totals are calculated from the entered rows and saved in the existing
-          invoice item format.
+          Total amount paid is the sum of all rows above.
         </p>
         <div className="flex flex-wrap gap-4 text-sm font-semibold text-foreground">
-          <span>Subtotal: {formatTZS(subtotal)}</span>
+          <span>Total: {formatTZS(subtotal)}</span>
         </div>
       </div>
     </div>
@@ -243,13 +243,13 @@ export function InvoiceItemsField({ initialRows }: InvoiceItemsFieldProps) {
 }
 
 type RowRenderProps = {
-  row: InvoiceRow;
+  row: ReceiptRow;
   descriptionOptions: string[];
   lineTotal: number;
   removeDisabled: boolean;
   onUpdate: (
     id: string,
-    field: keyof Omit<InvoiceRow, "id">,
+    field: keyof Omit<ReceiptRow, "id">,
     value: string,
   ) => void;
   onRemove: (id: string) => void;
@@ -346,9 +346,10 @@ function RowRender({
           size="sm"
           onClick={() => onRemove(row.id)}
           disabled={removeDisabled}
+          aria-label="Remove row"
+          title="Remove row"
         >
           <Trash2 size={14} />
-          Remove
         </Button>
       </td>
     </tr>

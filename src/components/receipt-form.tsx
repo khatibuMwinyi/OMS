@@ -4,8 +4,8 @@ import { useActionState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { LegacySelectionFields } from "@/components/legacy-selection-fields";
 import { RecordFieldRow } from "@/components/record-field-row";
+import { ReceiptItemsField } from "@/components/receipt-items-field";
 import { ReceiptPaymentFields } from "@/components/receipt-payment-fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,28 +14,26 @@ import {
   updateReceiptAction,
 } from "@/app/actions/records";
 import type { CategoryRecord } from "@/lib/categories";
-import { legacyReceiptRecords, type LegacySelectionRecord } from "@/lib/legacy-form-data";
+import type { ReceiptItemRecord } from "@/lib/records";
 
 type ReceiptFormDocument = {
   id: number;
   receiptNumber: string;
   receiptDate: string | null;
   customerName: string | null;
-  amount: number | string | null;
   phone: string | null;
-  code: string | null;
-  type: string | null;
-  category: string | null;
-  description: string | null;
   paymentMethod: string | null;
   bankName: string | null;
   referenceNumber: string | null;
+  depositorName: string | null;
+  receiptFilePath: string | null;
 };
 
 type ReceiptFormProps = {
   isEditing: boolean;
   nextReceiptNumber: string;
   document: ReceiptFormDocument | null;
+  initialItems?: ReceiptItemRecord[];
   categories?: CategoryRecord[];
 };
 
@@ -51,18 +49,11 @@ export function ReceiptForm({
   isEditing,
   nextReceiptNumber,
   document,
-  categories,
+  initialItems = [],
 }: ReceiptFormProps) {
   const router = useRouter();
   const lastHandledResult = useRef("");
-  
-  const records: LegacySelectionRecord[] = categories?.map(cat => ({
-    type: cat.type || "",
-    category: cat.category,
-    code: cat.code,
-    description: cat.description || "",
-  })) ?? legacyReceiptRecords;
-  
+
   const [submissionState, formAction, isPending] = useActionState<
     ReceiptFormState,
     FormData
@@ -100,6 +91,14 @@ export function ReceiptForm({
   const formKey = isEditing
     ? `receipt-edit-${document?.id ?? "new"}`
     : `receipt-create-${nextReceiptNumber}`;
+
+  const initialRows = initialItems.map((item) => ({
+    category: item.category ?? undefined,
+    description: item.description,
+    location: item.location ?? undefined,
+    quantity: String(item.quantity),
+    unitPrice: String(item.unitPrice),
+  }));
 
   return (
     <form key={formKey} action={formAction} className="space-y-6">
@@ -140,39 +139,12 @@ export function ReceiptForm({
               required
             />
           </RecordFieldRow>
-          <RecordFieldRow label="Amount paid">
-            <Input
-              name="amount"
-              type="number"
-              step="0.01"
-              defaultValue={document?.amount ?? ""}
-              required
-            />
+          <RecordFieldRow label="Customer phone">
+            <Input name="phone" defaultValue={document?.phone ?? ""} />
           </RecordFieldRow>
         </div>
 
-        <div className="overflow-hidden rounded-3xl border border-border bg-card/95">
-          <div className="border-b border-border/85 px-5 py-4">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Receipt details
-            </h3>
-          </div>
-
-          <div className="grid gap-4 p-5 lg:grid-cols-2">
-            <LegacySelectionFields
-              records={legacyReceiptRecords}
-              defaultType={document?.type ?? "Revenue"}
-              defaultCategory={document?.category ?? undefined}
-              defaultCode={document?.code ?? undefined}
-              defaultDescription={document?.description ?? undefined}
-              showAmount={false}
-            />
-            <label className="space-y-2 lg:col-span-2">
-              <span className="field-label">Customer phone</span>
-              <Input name="phone" defaultValue={document?.phone ?? ""} />
-            </label>
-          </div>
-        </div>
+        <ReceiptItemsField initialRows={initialRows} />
 
         <div className="overflow-hidden rounded-3xl border border-border bg-card/95">
           <div className="border-b border-border/85 px-5 py-4">
@@ -185,7 +157,40 @@ export function ReceiptForm({
             defaultBankName={document?.bankName ?? ""}
             defaultPaymentMethod={document?.paymentMethod ?? "Cash"}
             defaultReferenceNumber={document?.referenceNumber ?? ""}
+            defaultDepositorName={document?.depositorName ?? ""}
           />
+        </div>
+
+        <div className="overflow-hidden rounded-3xl border border-border bg-card/95">
+          <div className="border-b border-border/85 px-5 py-4">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Receipt file
+            </h3>
+          </div>
+
+          <div className="grid gap-4 p-5 lg:grid-cols-2">
+            <label className="space-y-2 lg:col-span-2">
+              <span className="field-label">Upload receipt file (PDF, JPG, PNG)</span>
+              <Input
+                name="receipt_file"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+              />
+              {document?.receiptFilePath ? (
+                <p className="text-sm text-muted-foreground">
+                  Current file:{" "}
+                  <a
+                    href={document.receiptFilePath}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    View file
+                  </a>
+                </p>
+              ) : null}
+            </label>
+          </div>
         </div>
 
         <div className="button-row">

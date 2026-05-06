@@ -100,6 +100,76 @@ async function resolveExistingSignaturePath(signaturePath: string) {
   return "";
 }
 
+function splitItemFields(line: string) {
+  const fields: string[] = [];
+  let current = "";
+  let escape = false;
+
+  for (const char of line) {
+    if (escape) {
+      current += char;
+      escape = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escape = true;
+      continue;
+    }
+
+    if (char === "|") {
+      fields.push(current);
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  fields.push(current);
+  return fields;
+}
+
+function parseLineItems(raw: FormDataEntryValue | null) {
+  const text = asString(raw);
+
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const fields = splitItemFields(line).map((segment) => segment.trim());
+
+      if (fields.length <= 3) {
+        const [description = "", quantity = "1", unitPrice = "0"] = fields;
+        return {
+          category: "",
+          description,
+          location: "",
+          quantity: Math.max(1, Number(quantity) || 1),
+          unitPrice: Number(unitPrice) || 0,
+        };
+      }
+
+      const [
+        category = "",
+        description = "",
+        location = "",
+        quantity = "1",
+        unitPrice = "0",
+      ] = fields;
+
+      return {
+        category,
+        description,
+        location,
+        quantity: Math.max(1, Number(quantity) || 1),
+        unitPrice: Number(unitPrice) || 0,
+      };
+    })
+    .filter((item) => item.description.length > 0);
+}
+
 function parseInvoiceItems(raw: FormDataEntryValue | null) {
   const text = asString(raw);
 
@@ -108,11 +178,32 @@ function parseInvoiceItems(raw: FormDataEntryValue | null) {
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const [description = "", quantity = "1", unitPrice = "0"] = line
-        .split("|")
-        .map((segment) => segment.trim());
+      const fields = splitItemFields(line).map((segment) => segment.trim());
+
+      // Backwards compatible: 3 fields = legacy description|qty|price
+      if (fields.length <= 3) {
+        const [description = "", quantity = "1", unitPrice = "0"] = fields;
+        return {
+          category: "",
+          description,
+          location: "",
+          quantity: Math.max(1, Number(quantity) || 1),
+          unitPrice: Number(unitPrice) || 0,
+        };
+      }
+
+      const [
+        category = "",
+        description = "",
+        location = "",
+        quantity = "1",
+        unitPrice = "0",
+      ] = fields;
+
       return {
+        category,
         description,
+        location,
         quantity: Math.max(1, Number(quantity) || 1),
         unitPrice: Number(unitPrice) || 0,
       };
@@ -162,18 +253,21 @@ export async function createInvoiceAction(formData: FormData) {
   const session = await requireSession();
   const invoiceNumber = await getNextInvoiceNumber();
   const paymentMethod = asString(formData.get("payment_method")) || "Cash";
-  const bankName =
-    paymentMethod === "Bank Transfer" ? FIXED_BANK_NAME : null;
-  const bankAccount =
-    paymentMethod === "Bank Transfer" ? FIXED_BANK_ACCOUNT_NUMBER : null;
-  const holderName =
-    paymentMethod === "Bank Transfer" ? FIXED_BANK_ACCOUNT_NAME : null;
+  const isBankBranch =
+    paymentMethod === "Bank Transfer" || paymentMethod === "Bank Deposit";
+  const bankName = isBankBranch ? FIXED_BANK_NAME : null;
+  const bankAccount = isBankBranch ? FIXED_BANK_ACCOUNT_NUMBER : null;
+  const holderName = isBankBranch ? FIXED_BANK_ACCOUNT_NAME : null;
   const mobileNumber =
     paymentMethod === "Mobile Money" ? FIXED_MOBILE_NUMBER : null;
   const mobileHolder =
     paymentMethod === "Mobile Money" ? FIXED_MOBILE_HOLDER_NAME : null;
   const mobileOperator =
     paymentMethod === "Mobile Money" ? FIXED_MOBILE_OPERATOR : null;
+  const depositorName =
+    paymentMethod === "Bank Deposit"
+      ? asString(formData.get("depositor_name"))
+      : "";
 
   if (
     paymentMethod === "Bank Transfer" &&
@@ -194,6 +288,14 @@ export async function createInvoiceAction(formData: FormData) {
       "/invoices",
       "error",
       "Mobile number, mobile holder name, and mobile operator are required for mobile money invoices.",
+    );
+  }
+
+  if (paymentMethod === "Bank Deposit" && !depositorName) {
+    goWithMessage(
+      "/invoices",
+      "error",
+      "Depositor name is required for bank deposit invoices.",
     );
   }
 
@@ -236,8 +338,9 @@ export async function createInvoiceAction(formData: FormData) {
         invoice_number, tin, invoice_date, director, phone,
         payment_method, bank_account, holder_name, bank_name,
         mobile_number, mobile_holder, mobile_operator,
+        depositor_name,
         subtotal, vat, discount, grand_total, user_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         invoiceNumber,
         parsed.data.tin,
@@ -251,6 +354,7 @@ export async function createInvoiceAction(formData: FormData) {
         mobileNumber,
         mobileHolder,
         mobileOperator,
+        depositorName || null,
         subtotal,
         vat,
         discount,
@@ -262,7 +366,9 @@ export async function createInvoiceAction(formData: FormData) {
     const invoiceId = result.insertId;
     const itemValues = items.map((item) => [
       invoiceId,
+      item.category || null,
       item.description,
+      item.location || null,
       item.quantity,
       item.unitPrice,
       item.quantity * item.unitPrice,
@@ -270,8 +376,8 @@ export async function createInvoiceAction(formData: FormData) {
 
     for (const item of itemValues) {
       await connection.execute(
-        `INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, total)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO invoice_items (invoice_id, category, description, location, quantity, unit_price, total)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         item,
       );
     }
@@ -290,18 +396,21 @@ export async function updateInvoiceAction(formData: FormData) {
   const session = await requireSession();
   await ensureDocumentWorkflowColumns();
   const paymentMethod = asString(formData.get("payment_method")) || "Cash";
-  const bankName =
-    paymentMethod === "Bank Transfer" ? FIXED_BANK_NAME : null;
-  const bankAccount =
-    paymentMethod === "Bank Transfer" ? FIXED_BANK_ACCOUNT_NUMBER : null;
-  const holderName =
-    paymentMethod === "Bank Transfer" ? FIXED_BANK_ACCOUNT_NAME : null;
+  const isBankBranch =
+    paymentMethod === "Bank Transfer" || paymentMethod === "Bank Deposit";
+  const bankName = isBankBranch ? FIXED_BANK_NAME : null;
+  const bankAccount = isBankBranch ? FIXED_BANK_ACCOUNT_NUMBER : null;
+  const holderName = isBankBranch ? FIXED_BANK_ACCOUNT_NAME : null;
   const mobileNumber =
     paymentMethod === "Mobile Money" ? FIXED_MOBILE_NUMBER : null;
   const mobileHolder =
     paymentMethod === "Mobile Money" ? FIXED_MOBILE_HOLDER_NAME : null;
   const mobileOperator =
     paymentMethod === "Mobile Money" ? FIXED_MOBILE_OPERATOR : null;
+  const depositorName =
+    paymentMethod === "Bank Deposit"
+      ? asString(formData.get("depositor_name"))
+      : "";
 
   if (
     paymentMethod === "Bank Transfer" &&
@@ -322,6 +431,14 @@ export async function updateInvoiceAction(formData: FormData) {
       "/invoices",
       "error",
       "Mobile number, mobile holder name, and mobile operator are required for mobile money invoices.",
+    );
+  }
+
+  if (paymentMethod === "Bank Deposit" && !depositorName) {
+    goWithMessage(
+      "/invoices",
+      "error",
+      "Depositor name is required for bank deposit invoices.",
     );
   }
 
@@ -391,6 +508,7 @@ export async function updateInvoiceAction(formData: FormData) {
     mobileNumber,
     mobileHolder,
     mobileOperator,
+    depositorName || null,
     subtotal,
     vat,
     discount,
@@ -404,6 +522,7 @@ export async function updateInvoiceAction(formData: FormData) {
          SET invoice_number = ?, tin = ?, invoice_date = ?, director = ?, phone = ?,
            payment_method = ?, bank_account = ?, holder_name = ?, bank_name = ?,
            mobile_number = ?, mobile_holder = ?, mobile_operator = ?,
+           depositor_name = ?,
            subtotal = ?, vat = ?, discount = ?, grand_total = ?
        WHERE id = ?`,
       invoiceParams,
@@ -419,11 +538,13 @@ export async function updateInvoiceAction(formData: FormData) {
 
     for (const item of items) {
       await connection.execute(
-        `INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, total)
-         VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO invoice_items (invoice_id, category, description, location, quantity, unit_price, total)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           parsed.data.invoice_id,
+          item.category || null,
           item.description,
+          item.location || null,
           item.quantity,
           item.unitPrice,
           item.quantity * item.unitPrice,
@@ -442,7 +563,6 @@ const receiptSchema = z.object({
   customer_name: z.string().min(1),
   receipt_date: z.string().min(1),
   payment_method: z.string().min(1),
-  amount: z.coerce.number().positive(),
 });
 
 type ReceiptActionState = {
@@ -477,8 +597,14 @@ export async function createReceiptAction(
 
   const session = await requireSession();
   const paymentMethod = asString(formData.get("payment_method")) || "Cash";
-  const bankName = FIXED_BANK_NAME;
+  const isBankBranch =
+    paymentMethod === "Bank Transfer" || paymentMethod === "Bank Deposit";
+  const bankName = isBankBranch ? FIXED_BANK_NAME : null;
   const referenceNumber = asString(formData.get("reference_number")) || null;
+  const depositorName =
+    paymentMethod === "Bank Deposit"
+      ? asString(formData.get("depositor_name"))
+      : "";
   const isAsync = asString(formData.get("__async")) === "1";
 
   if (paymentMethod === "Bank Transfer" && (!bankName || !referenceNumber)) {
@@ -490,12 +616,32 @@ export async function createReceiptAction(
     );
   }
 
+  if (paymentMethod === "Bank Deposit" && !depositorName) {
+    return finishReceiptAction(
+      "/receipts",
+      "error",
+      "Depositor name is required for bank deposit receipts.",
+      isAsync,
+    );
+  }
+
+  const items = parseLineItems(formData.get("receipt_items"));
+  if (!items.length) {
+    return finishReceiptAction(
+      "/receipts",
+      "error",
+      "Add at least one receipt item.",
+      isAsync,
+    );
+  }
+
+  const amount = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+
   const parsed = receiptSchema.safeParse({
     receipt_number: formData.get("receipt_number"),
     customer_name: formData.get("customer_name"),
     receipt_date: formData.get("receipt_date"),
     payment_method: formData.get("payment_method"),
-    amount: asNumber(formData.get("amount")),
   });
 
   if (!parsed.success) {
@@ -507,28 +653,62 @@ export async function createReceiptAction(
     );
   }
 
-  await execute(
-    `INSERT INTO receipts (
-      receipt_number, customer_name, code, type, category, description,
-      phone, amount, payment_method, bank_name,
-      reference_number, receipt_date, user_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      parsed.data.receipt_number,
-      parsed.data.customer_name,
-      asString(formData.get("code")) || null,
-      asString(formData.get("type")) || null,
-      asString(formData.get("category")) || null,
-      asString(formData.get("description")) || null,
-      asString(formData.get("phone")) || null,
-      parsed.data.amount,
-      parsed.data.payment_method,
-      bankName,
-      referenceNumber,
-      parsed.data.receipt_date,
-      session.userId,
-    ],
-  );
+  let receiptFilePath: string | null = null;
+  const fileEntry = formData.get("receipt_file");
+  if (fileEntry instanceof File && fileEntry.size > 0) {
+    const uploadDirectory = path.join(
+      process.cwd(),
+      "public",
+      "uploads",
+      "receipts",
+    );
+    await mkdir(uploadDirectory, { recursive: true });
+    const ext = path.extname(fileEntry.name) || ".pdf";
+    const storedFileName = `receipt-${parsed.data.receipt_number}-${randomUUID()}${ext}`;
+    const storedFilePath = path.join(uploadDirectory, storedFileName);
+    receiptFilePath = `/uploads/receipts/${storedFileName}`;
+    await writeFile(storedFilePath, Buffer.from(await fileEntry.arrayBuffer()));
+  }
+
+  await withTransaction(async (connection) => {
+    const [result] = await connection.execute<ResultSetHeader>(
+      `INSERT INTO receipts (
+        receipt_number, customer_name, phone,
+        amount, payment_method, bank_name,
+        reference_number, depositor_name, receipt_date, receipt_file_path, user_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        parsed.data.receipt_number,
+        parsed.data.customer_name,
+        asString(formData.get("phone")) || null,
+        amount,
+        parsed.data.payment_method,
+        bankName,
+        referenceNumber,
+        depositorName || null,
+        parsed.data.receipt_date,
+        receiptFilePath,
+        session.userId,
+      ] as unknown as Array<string | number>,
+    );
+
+    const receiptId = result.insertId;
+    for (const item of items) {
+      await connection.execute(
+        `INSERT INTO receipt_items (receipt_id, category, description, location, quantity, unit_price, total)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          receiptId,
+          item.category || null,
+          item.description,
+          item.location || null,
+          item.quantity,
+          item.unitPrice,
+          item.quantity * item.unitPrice,
+        ],
+      );
+    }
+  });
 
   revalidatePath("/dashboard");
   revalidatePath("/receipts");
@@ -556,14 +736,46 @@ export async function updateReceiptAction(
   const session = await requireSession();
   await ensureDocumentWorkflowColumns();
   const isAsync = asString(formData.get("__async")) === "1";
-  const bankName = FIXED_BANK_NAME;
+  const paymentMethodForBank = asString(formData.get("payment_method")) || "Cash";
+  const isBankBranch =
+    paymentMethodForBank === "Bank Transfer" ||
+    paymentMethodForBank === "Bank Deposit";
+  const bankName = isBankBranch ? FIXED_BANK_NAME : null;
+  const depositorName =
+    paymentMethodForBank === "Bank Deposit"
+      ? asString(formData.get("depositor_name"))
+      : "";
+
+  if (paymentMethodForBank === "Bank Deposit" && !depositorName) {
+    return finishReceiptAction(
+      "/receipts",
+      "error",
+      "Depositor name is required for bank deposit receipts.",
+      isAsync,
+    );
+  }
+
+  const updateItems = parseLineItems(formData.get("receipt_items"));
+  if (!updateItems.length) {
+    return finishReceiptAction(
+      "/receipts",
+      "error",
+      "Add at least one receipt item.",
+      isAsync,
+    );
+  }
+
+  const updateAmount = updateItems.reduce(
+    (sum, item) => sum + item.quantity * item.unitPrice,
+    0,
+  );
+
   const parsed = receiptUpdateSchema.safeParse({
     receipt_id: formData.get("receipt_id"),
     receipt_number: formData.get("receipt_number"),
     customer_name: formData.get("customer_name"),
     receipt_date: formData.get("receipt_date"),
     payment_method: formData.get("payment_method"),
-    amount: asNumber(formData.get("amount")),
   });
 
   if (!parsed.success) {
@@ -601,39 +813,86 @@ export async function updateReceiptAction(
     );
   }
 
-  const params = [
-    parsed.data.receipt_number,
-    parsed.data.customer_name,
-    asString(formData.get("code")) || null,
-    asString(formData.get("type")) || null,
-    asString(formData.get("category")) || null,
-    asString(formData.get("description")) || null,
-    asString(formData.get("phone")) || null,
-    parsed.data.amount,
-    parsed.data.payment_method,
-    bankName,
-    asString(formData.get("reference_number")) || null,
-    parsed.data.receipt_date,
-    parsed.data.receipt_id,
-  ];
-
-  const result = await execute(
-    `UPDATE receipts
-     SET receipt_number = ?, customer_name = ?, code = ?, type = ?, category = ?, description = ?,
-         phone = ?, amount = ?, payment_method = ?, bank_name = ?,
-         reference_number = ?, receipt_date = ?
-     WHERE id = ?`,
-    params,
-  );
-
-  if (result.affectedRows === 0) {
-    return finishReceiptAction(
-      "/receipts",
-      "error",
-      "Receipt not found.",
-      isAsync,
+  let receiptFilePath: string | null = null;
+  const fileEntry = formData.get("receipt_file");
+  if (fileEntry instanceof File && fileEntry.size > 0) {
+    const uploadDirectory = path.join(
+      process.cwd(),
+      "public",
+      "uploads",
+      "receipts",
     );
+    await mkdir(uploadDirectory, { recursive: true });
+    const ext = path.extname(fileEntry.name) || ".pdf";
+    const storedFileName = `receipt-${parsed.data.receipt_number}-${randomUUID()}${ext}`;
+    const storedFilePath = path.join(uploadDirectory, storedFileName);
+    receiptFilePath = `/uploads/receipts/${storedFileName}`;
+    await writeFile(storedFilePath, Buffer.from(await fileEntry.arrayBuffer()));
   }
+
+  const referenceNumberUpdate = asString(formData.get("reference_number")) || null;
+
+  await withTransaction(async (connection) => {
+    const updateColumns = [
+      "receipt_number = ?",
+      "customer_name = ?",
+      "phone = ?",
+      "amount = ?",
+      "payment_method = ?",
+      "bank_name = ?",
+      "reference_number = ?",
+      "depositor_name = ?",
+      "receipt_date = ?",
+    ];
+    const params: Array<string | number | null> = [
+      parsed.data.receipt_number,
+      parsed.data.customer_name,
+      asString(formData.get("phone")) || null,
+      updateAmount,
+      parsed.data.payment_method,
+      bankName,
+      referenceNumberUpdate,
+      depositorName || null,
+      parsed.data.receipt_date,
+    ];
+
+    if (receiptFilePath) {
+      updateColumns.push("receipt_file_path = ?");
+      params.push(receiptFilePath);
+    }
+
+    params.push(parsed.data.receipt_id);
+
+    const [result] = await connection.execute<ResultSetHeader>(
+      `UPDATE receipts SET ${updateColumns.join(", ")} WHERE id = ?`,
+      params,
+    );
+
+    if (result.affectedRows === 0) {
+      throw new Error("Receipt not found.");
+    }
+
+    await connection.execute(
+      "DELETE FROM receipt_items WHERE receipt_id = ?",
+      [parsed.data.receipt_id],
+    );
+
+    for (const item of updateItems) {
+      await connection.execute(
+        `INSERT INTO receipt_items (receipt_id, category, description, location, quantity, unit_price, total)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          parsed.data.receipt_id,
+          item.category || null,
+          item.description,
+          item.location || null,
+          item.quantity,
+          item.unitPrice,
+          item.quantity * item.unitPrice,
+        ],
+      );
+    }
+  });
 
   revalidatePath("/dashboard");
   revalidatePath("/receipts");
@@ -714,6 +973,7 @@ function parseVoucherPaymentDetails(formData: FormData, paymentMethod: string) {
   const mobileNumberInput = asString(formData.get("mobile_number"));
   const payerNameInput = asString(formData.get("payer_name"));
   const mobileReferenceInput = asString(formData.get("mobile_reference"));
+  const depositorNameInput = asString(formData.get("depositor_name"));
 
   if (paymentMethod === "Bank Transfer") {
     if (
@@ -737,6 +997,7 @@ function parseVoucherPaymentDetails(formData: FormData, paymentMethod: string) {
       mobileNumber: null,
       payerName: null,
       mobileReference: null,
+      depositorName: null,
     };
   }
 
@@ -757,6 +1018,28 @@ function parseVoucherPaymentDetails(formData: FormData, paymentMethod: string) {
       mobileNumber: mobileNumberInput,
       payerName: payerNameInput,
       mobileReference: mobileReferenceInput,
+      depositorName: null,
+    };
+  }
+
+  if (paymentMethod === "Bank Deposit") {
+    if (!depositorNameInput) {
+      goWithMessage(
+        "/payment-vouchers",
+        "error",
+        "Depositor name is required for bank deposit vouchers.",
+      );
+    }
+
+    return {
+      bankName: FIXED_BANK_NAME,
+      accountNumber: FIXED_BANK_ACCOUNT_NUMBER,
+      accountName: FIXED_BANK_ACCOUNT_NAME,
+      bankReference: null,
+      mobileNumber: null,
+      payerName: null,
+      mobileReference: null,
+      depositorName: depositorNameInput,
     };
   }
 
@@ -768,6 +1051,7 @@ function parseVoucherPaymentDetails(formData: FormData, paymentMethod: string) {
     mobileNumber: null,
     payerName: null,
     mobileReference: null,
+    depositorName: null,
   };
 }
 
@@ -799,6 +1083,7 @@ export async function createVoucherAction(formData: FormData) {
     mobileNumber,
     payerName,
     mobileReference,
+    depositorName,
   } = parseVoucherPaymentDetails(formData, paymentMethod);
   const now = new Date().toISOString().slice(0, 19).replace("T", " ");
   const autoApprove = session.role === "admin";
@@ -807,9 +1092,10 @@ export async function createVoucherAction(formData: FormData) {
     `INSERT INTO payment_vouchers (
       voucher_number, date, customer_name, payment_method, bank_name, account_number,
       account_name, bank_reference, mobile_number, payer_name, mobile_reference,
+      depositor_name,
       code, type, category, description, amount, status, admin_comment,
       approved_by, approved_at, rejected_by, rejected_at, user_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
     [
       parsed.data.voucher_number,
       parsed.data.date,
@@ -822,6 +1108,7 @@ export async function createVoucherAction(formData: FormData) {
       mobileNumber,
       payerName,
       mobileReference,
+      depositorName,
       asString(formData.get("code")) || null,
       asString(formData.get("type")) || null,
       parsed.data.category,
@@ -911,6 +1198,7 @@ export async function updateVoucherAction(formData: FormData) {
     mobileNumber,
     payerName,
     mobileReference,
+    depositorName,
   } = parseVoucherPaymentDetails(formData, paymentMethod);
   const now = new Date().toISOString().slice(0, 19).replace("T", " ");
   const autoApprove = session.role === "admin";
@@ -928,6 +1216,7 @@ export async function updateVoucherAction(formData: FormData) {
          mobile_number = ?,
          payer_name = ?,
          mobile_reference = ?,
+         depositor_name = ?,
          code = ?,
          type = ?,
          category = ?,
@@ -952,6 +1241,7 @@ export async function updateVoucherAction(formData: FormData) {
       mobileNumber,
       payerName,
       mobileReference,
+      depositorName,
       asString(formData.get("code")) || null,
       asString(formData.get("type")) || null,
       parsed.data.category,
@@ -1055,6 +1345,7 @@ const letterSchema = z.object({
   subject: z.string().min(1),
   letter_date: z.string().min(1),
   custom_message: z.string().min(1),
+  language: z.enum(["en", "sw"]).default("en"),
 });
 
 export async function createLetterAction(formData: FormData) {
@@ -1066,6 +1357,7 @@ export async function createLetterAction(formData: FormData) {
     subject: formData.get("subject"),
     letter_date: formData.get("letter_date"),
     custom_message: formData.get("custom_message"),
+    language: asString(formData.get("language")) || "en",
   });
 
   if (!parsed.success) {
@@ -1098,14 +1390,15 @@ export async function createLetterAction(formData: FormData) {
     );
 
     await connection.execute(
-      `INSERT INTO letter_content (letter_id, letter_date, receiver_address, heading, body)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO letter_content (letter_id, letter_date, receiver_address, heading, body, language)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       [
         letterId,
         parsed.data.letter_date,
         parsed.data.recipient_address,
         parsed.data.subject,
         buildLetterBody(parsed.data.custom_message),
+        parsed.data.language,
       ],
     );
   });
@@ -1206,6 +1499,7 @@ export async function updateLetterAction(formData: FormData) {
     subject: formData.get("subject"),
     letter_date: formData.get("letter_date"),
     custom_message: formData.get("custom_message"),
+    language: asString(formData.get("language")) || "en",
   });
 
   if (!parsed.success) {
@@ -1256,19 +1550,21 @@ export async function updateLetterAction(formData: FormData) {
     }
 
     await connection.execute(
-      `INSERT INTO letter_content (letter_id, letter_date, receiver_address, heading, body)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO letter_content (letter_id, letter_date, receiver_address, heading, body, language)
+       VALUES (?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          letter_date = VALUES(letter_date),
          receiver_address = VALUES(receiver_address),
          heading = VALUES(heading),
-         body = VALUES(body)`,
+         body = VALUES(body),
+         language = VALUES(language)`,
       [
         parsed.data.letter_id,
         parsed.data.letter_date,
         parsed.data.recipient_address,
         parsed.data.subject,
         buildLetterBody(parsed.data.custom_message),
+        parsed.data.language,
       ],
     );
   });
@@ -1427,7 +1723,7 @@ export async function updatePettyCashStatusAction(formData: FormData) {
     );
   }
 
-  revalidatePath("/dashboard");
+   revalidatePath("/dashboard");
   revalidatePath("/approvals");
   revalidatePath("/petty-cash");
   goWithMessage(
@@ -1437,4 +1733,135 @@ export async function updatePettyCashStatusAction(formData: FormData) {
       ? "Petty cash record approved."
       : "Petty cash record rejected.",
   );
+}
+
+async function requireDeleter(redirectPath: string) {
+  const session = await getCurrentSession();
+  if (!session) {
+    redirect("/");
+  }
+  if (session.role !== "admin" && session.role !== "director") {
+    goWithMessage(redirectPath, "error", "Only admins and directors can delete records.");
+  }
+  return session;
+}
+
+async function unlinkPublicFile(publicPath: string | null | undefined) {
+  if (!publicPath) return;
+  try {
+    const trimmed = publicPath.replace(/^\/+/, "");
+    const absolutePath = path.join(process.cwd(), "public", trimmed);
+    await unlink(absolutePath);
+  } catch {
+    // File may already be missing; ignore.
+  }
+}
+
+const deleteIdSchema = z.object({ id: z.coerce.number().int().positive() });
+
+export async function deleteInvoiceAction(formData: FormData) {
+  await requireDeleter("/invoices");
+  const parsed = deleteIdSchema.safeParse({ id: formData.get("id") });
+  if (!parsed.success) goWithMessage("/invoices", "error", "Invalid invoice id.");
+
+  await execute(`DELETE FROM invoice_items WHERE invoice_id = ?`, [parsed.data.id]);
+  const result = await execute(`DELETE FROM invoices WHERE id = ?`, [parsed.data.id]);
+  if (result.affectedRows === 0) goWithMessage("/invoices", "error", "Invoice not found.");
+
+  revalidatePath("/dashboard");
+  revalidatePath("/invoices");
+  goWithMessage("/invoices", "status", "Invoice deleted.");
+}
+
+export async function deleteReceiptAction(formData: FormData) {
+  await requireDeleter("/receipts");
+  const parsed = deleteIdSchema.safeParse({ id: formData.get("id") });
+  if (!parsed.success) goWithMessage("/receipts", "error", "Invalid receipt id.");
+
+  const [existing] = await queryRows<{ receiptFilePath: string | null }>(
+    `SELECT receipt_file_path AS receiptFilePath FROM receipts WHERE id = ? LIMIT 1`,
+    [parsed.data.id],
+  );
+
+  await execute(`DELETE FROM receipt_items WHERE receipt_id = ?`, [parsed.data.id]).catch(() => undefined);
+  const result = await execute(`DELETE FROM receipts WHERE id = ?`, [parsed.data.id]);
+  if (result.affectedRows === 0) goWithMessage("/receipts", "error", "Receipt not found.");
+
+  await unlinkPublicFile(existing?.receiptFilePath ?? null);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/receipts");
+  goWithMessage("/receipts", "status", "Receipt deleted.");
+}
+
+export async function deleteVoucherAction(formData: FormData) {
+  await requireDeleter("/payment-vouchers");
+  const parsed = deleteIdSchema.safeParse({ id: formData.get("id") });
+  if (!parsed.success) goWithMessage("/payment-vouchers", "error", "Invalid voucher id.");
+
+  const result = await execute(`DELETE FROM payment_vouchers WHERE id = ?`, [parsed.data.id]);
+  if (result.affectedRows === 0) goWithMessage("/payment-vouchers", "error", "Voucher not found.");
+
+  revalidatePath("/dashboard");
+  revalidatePath("/payment-vouchers");
+  revalidatePath("/approvals");
+  goWithMessage("/payment-vouchers", "status", "Voucher deleted.");
+}
+
+export async function deleteLetterAction(formData: FormData) {
+  await requireDeleter("/letters");
+  const parsed = deleteIdSchema.safeParse({ id: formData.get("id") });
+  if (!parsed.success) goWithMessage("/letters", "error", "Invalid letter id.");
+
+  const [existing] = await queryRows<{ pdfPath: string | null }>(
+    `SELECT pdf_path AS pdfPath FROM printed_letters WHERE id = ? LIMIT 1`,
+    [parsed.data.id],
+  );
+
+  await execute(`DELETE FROM letter_content WHERE letter_id = ?`, [parsed.data.id]).catch(() => undefined);
+  const result = await execute(`DELETE FROM printed_letters WHERE id = ?`, [parsed.data.id]);
+  if (result.affectedRows === 0) goWithMessage("/letters", "error", "Letter not found.");
+
+  await unlinkPublicFile(existing?.pdfPath ?? null);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/letters");
+  goWithMessage("/letters", "status", "Letter deleted.");
+}
+
+export async function deletePettyCashAction(formData: FormData) {
+  await requireDeleter("/petty-cash");
+  const parsed = deleteIdSchema.safeParse({ id: formData.get("id") });
+  if (!parsed.success) goWithMessage("/petty-cash", "error", "Invalid petty cash id.");
+
+  const result = await execute(
+    `DELETE FROM petty_cash_transactions WHERE id = ?`,
+    [parsed.data.id],
+  );
+  if (result.affectedRows === 0) goWithMessage("/petty-cash", "error", "Petty cash record not found.");
+
+  revalidatePath("/dashboard");
+  revalidatePath("/petty-cash");
+  revalidatePath("/approvals");
+  goWithMessage("/petty-cash", "status", "Petty cash record deleted.");
+}
+
+export async function deleteIncomingLetterAction(formData: FormData) {
+  await requireDeleter("/letters");
+  const parsed = deleteIdSchema.safeParse({ id: formData.get("id") });
+  if (!parsed.success) goWithMessage("/letters", "error", "Invalid incoming letter id.");
+
+  const [existing] = await queryRows<{ pdfPath: string | null }>(
+    `SELECT pdf_path AS pdfPath FROM incoming_letters WHERE id = ? LIMIT 1`,
+    [parsed.data.id],
+  );
+
+  const result = await execute(`DELETE FROM incoming_letters WHERE id = ?`, [parsed.data.id]);
+  if (result.affectedRows === 0) goWithMessage("/letters", "error", "Incoming letter not found.");
+
+  await unlinkPublicFile(existing?.pdfPath ?? null);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/letters");
+  goWithMessage("/letters", "status", "Incoming letter deleted.");
 }

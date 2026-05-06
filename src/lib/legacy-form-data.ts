@@ -34,7 +34,9 @@ export const legacyReceiptRecords: LegacySelectionRecord[] = [
   { type: "Revenue", category: "Oweru Tech Systems", code: "RC-503", description: "Marketplace Commission" },
   { type: "Revenue", category: "Oweru Tech Systems", code: "RC-504", description: "Property Management Commission" },
   { type: "Revenue", category: "Oweru Tech Systems", code: "RC-505", description: "Freelance Marketplace Commission" },
-    { type: "Revenue", category: "Oweru Tech Systems", code: "RC-506", description: "Rental Income" }
+  { type: "Revenue", category: "Oweru Tech Systems", code: "RC-506", description: "Rental Income" },
+  { type: "Revenue", category: "Oweru Rentals", code: "RC-601", description: "AirBnB Kigamboni" },
+  { type: "Revenue", category: "Oweru Rentals", code: "RC-602", description: "Office Space Uhasibu" },
 ];
 
 export const legacyPettyCashRecords: LegacySelectionRecord[] = [
