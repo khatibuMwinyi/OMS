@@ -125,6 +125,58 @@ const createUserSchema = z.object({
   signature_image_path: z.string().trim().optional(),
 });
 
+export async function deleteUserAction(
+  formData: FormData
+): Promise<never> {
+  const session = await getCurrentSession();
+  if (!session || session.role !== "admin") {
+    redirect("/admin/users?error=Only%20admins%20can%20delete%20users.");
+  }
+  const userId = Number(formData.get("user_id"));
+  if (!Number.isInteger(userId) || userId <= 0) {
+    redirect("/admin/users?error=Invalid%20user%20ID.");
+  }
+  await execute("DELETE FROM users WHERE id = ?", [userId]);
+  revalidatePath("/admin/users");
+  redirect("/admin/users?status=User%20deleted%20successfully.");
+}
+
+const updateUserSchema = z.object({
+  user_id: z.coerce.number().int().positive(),
+  role: z.enum(["admin", "secretary", "director"]),
+  signature_image_path: z.string().trim().optional(),
+});
+
+export async function updateUserAction(
+  formData: FormData
+): Promise<never> {
+  const session = await getCurrentSession();
+  if (!session || session.role !== "admin") {
+    redirect("/admin/users?error=Only%20admins%20can%20update%20users.");
+  }
+  const parsed = updateUserSchema.safeParse({
+    user_id: formData.get("user_id"),
+    role: formData.get("role"),
+    signature_image_path: formData.get("signature_image_path"),
+  });
+  if (!parsed.success) {
+    redirect(
+      `/admin/users?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Invalid user data")}`,
+    );
+  }
+  await ensureDocumentWorkflowColumns();
+  const signatureImagePath = parsed.data.signature_image_path?.trim() || null;
+  const result = await execute(
+    "UPDATE users SET role = ?, signature_image_path = ? WHERE id = ?",
+    [parsed.data.role, signatureImagePath, parsed.data.user_id],
+  );
+  if (result.affectedRows === 0) {
+    redirect("/admin/users?error=User%20not%20found.");
+  }
+  revalidatePath("/admin/users");
+  redirect("/admin/users?status=User%20updated%20successfully.");
+}
+
 export async function createUserAction(
   formData: FormData,
 ): Promise<never> {

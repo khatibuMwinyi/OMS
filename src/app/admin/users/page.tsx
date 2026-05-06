@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
+import { Pencil, Trash2 } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
+import { ConfirmSubmit } from "@/components/confirm-submit";
 import { RouteToast } from "@/components/route-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { createUserAction } from "@/app/actions/auth";
+import { createUserAction, updateUserAction, deleteUserAction } from "@/app/actions/auth";
 import { listUsers } from "@/lib/users";
 import { getCurrentSession } from "@/lib/session-server";
 
@@ -21,6 +23,7 @@ type PageProps = {
   searchParams?: Promise<{
     status?: string;
     error?: string;
+    edit?: string;
   }>;
 };
 
@@ -33,6 +36,16 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
   const resolvedSearchParams = (await searchParams) ?? {};
   const users = await listUsers();
 
+  const editId = Number(resolvedSearchParams.edit);
+  const isEditing = Number.isFinite(editId) && editId > 0;
+  const editUser = isEditing
+    ? users.find((u) => u.id === editId) ?? null
+    : null;
+
+  if (isEditing && !editUser) {
+    redirect("/admin/users?error=User%20not%20found.");
+  }
+
   return (
     <main className="dashboard-shell">
       <AppHeader session={session} activeHref="/admin/users" />
@@ -43,7 +56,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
             <span className="eyebrow">Administration</span>
             <h1 className="page-title">User management</h1>
             <p className="subtle-copy">
-              Create new system users and assign secretary or admin access.
+              Create new system users and assign secretary, director or admin access.
             </p>
           </div>
         </section>
@@ -57,42 +70,87 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
           <section className="section-card form-card">
             <div className="section-head">
               <div>
-                <span className="eyebrow">Add user</span>
-                <h2 className="section-title">Create login account</h2>
+                <span className="eyebrow">
+                  {isEditing ? "Edit user" : "Add user"}
+                </span>
+                <h2 className="section-title">
+                  {isEditing ? "Update user details" : "Create login account"}
+                </h2>
               </div>
             </div>
 
-            <form
-              action={createUserAction}
-              className="form-grid form-grid--wide"
-            >
-              <label className="space-y-2">
-                <span className="field-label">Username</span>
-                <Input name="username" autoComplete="off" required />
-              </label>
-              <label className="space-y-2">
-                <span className="field-label">Password</span>
-                <Input name="password" type="password" required />
-              </label>
-              <label className="space-y-2">
-                <span className="field-label">Role</span>
-                <Select name="role" defaultValue="secretary">
-                  <option value="secretary">Secretary</option>
-                  <option value="admin">Admin</option>
-                  <option value="director">Director</option>
-                </Select>
-              </label>
-              <label className="space-y-2 lg:col-span-2">
-                <span className="field-label">Signature image path (optional)</span>
-                <Input
-                  name="signature_image_path"
-                  placeholder="/uploads/signatures/admin-signature.png"
-                />
-              </label>
-              <div className="button-row lg:col-span-2">
-                <Button type="submit">Add user</Button>
-              </div>
-            </form>
+            {isEditing && editUser ? (
+              <form
+                action={updateUserAction}
+                className="form-grid form-grid--wide"
+              >
+                <input name="user_id" type="hidden" value={editUser.id} readOnly />
+                <label className="space-y-2">
+                  <span className="field-label">Username</span>
+                  <Input value={editUser.username} readOnly />
+                </label>
+                <label className="space-y-2">
+                  <span className="field-label">Role</span>
+                  <Select name="role" defaultValue={editUser.role}>
+                    <option value="secretary">Secretary</option>
+                    <option value="director">Director</option>
+                    <option value="admin">Admin</option>
+                  </Select>
+                </label>
+                <label className="space-y-2 lg:col-span-2">
+                  <span className="field-label">Signature image path (optional)</span>
+                  <Input
+                    name="signature_image_path"
+                    defaultValue={editUser.signatureImagePath ?? ""}
+                    placeholder="/uploads/signatures/admin-signature.png"
+                  />
+                </label>
+                <div className="button-row lg:col-span-2">
+                  <Button type="submit">Update user</Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      window.location.href = "/admin/users";
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <form
+                action={createUserAction}
+                className="form-grid form-grid--wide"
+              >
+                <label className="space-y-2">
+                  <span className="field-label">Username</span>
+                  <Input name="username" autoComplete="off" required />
+                </label>
+                <label className="space-y-2">
+                  <span className="field-label">Password</span>
+                  <Input name="password" type="password" required />
+                </label>
+                <label className="space-y-2">
+                  <span className="field-label">Role</span>
+                  <Select name="role" defaultValue="secretary">
+                    <option value="secretary">Secretary</option>
+                    <option value="director">Director</option>
+                    <option value="admin">Admin</option>
+                  </Select>
+                </label>
+                <label className="space-y-2 lg:col-span-2">
+                  <span className="field-label">Signature image path (optional)</span>
+                  <Input
+                    name="signature_image_path"
+                    placeholder="/uploads/signatures/admin-signature.png"
+                  />
+                </label>
+                <div className="button-row lg:col-span-2">
+                  <Button type="submit">Add user</Button>
+                </div>
+              </form>
+            )}
           </section>
 
           <section className="section-card">
@@ -116,8 +174,11 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                     <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                       Signature path
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                       Created
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -147,9 +208,38 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                       </td>
                       <td
                         data-label="Created"
-                        className="px-4 py-4 align-top text-right text-sm text-foreground/85"
+                        className="px-4 py-4 align-top text-sm text-foreground/85"
                       >
                         {formatDate(user.createdAt)}
+                      </td>
+                      <td
+                        data-label="Actions"
+                        className="px-4 py-4 align-top text-right text-sm"
+                      >
+                        <div className="flex items-center justify-end gap-2">
+                          <a
+                            href={`/admin/users?edit=${user.id}`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card/95 text-foreground/75 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/20 hover:bg-primary/5 hover:text-primary"
+                            aria-label="Edit user"
+                            title="Edit user"
+                          >
+                            <Pencil size={14} />
+                          </a>
+                          <form
+                            action={deleteUserAction}
+                            style={{ display: "inline" }}
+                          >
+                            <input name="user_id" type="hidden" value={user.id} readOnly />
+                            <ConfirmSubmit
+                              message="Delete this user? This action cannot be undone."
+                              ariaLabel="Delete user"
+                              title="Delete user"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card/95 text-destructive shadow-sm transition hover:-translate-y-0.5 hover:border-destructive/40 hover:bg-destructive/10"
+                            >
+                              <Trash2 size={14} />
+                            </ConfirmSubmit>
+                          </form>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -157,7 +247,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
                     <tr>
                       <td
                         className="px-4 py-8 text-sm text-muted-foreground"
-                        colSpan={4}
+                        colSpan={5}
                       >
                         No users found.
                       </td>
