@@ -164,25 +164,106 @@ export async function buildFormalLetterPdf(
     | "body"
     | "status"
     | "approvedSignaturePath"
+    | "language"
   >,
+  opts: { includeSignature?: boolean } = {},
 ) {
-  const pdfDoc = await createPdfDocument("LETTER H.pdf");
-  const page = pdfDoc.getPages()[0];
+  const isSwahili = document.language === "sw";
+  const recipientLabel = isSwahili ? "KWA:" : "TO:";
+  const greeting = isSwahili ? "Ndugu." : "Dear Sir/Madam.";
+  const subjectPrefix = isSwahili ? "KUH:" : "RE:";
+
+  const pdfDoc = await PDFDocument.create();
   const boldFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
   const regularFont = await pdfDoc.embedFont(StandardFonts.TimesRoman);
   const dark = rgb(0.18, 0.22, 0.3);
 
-  const pageWidth = page.getWidth();
-  const pageHeight = page.getHeight();
+  const fontSize = 12;
+  const lineSpacing = fontSize * 1.5;
   const leftX = 66;
   const rightMargin = 66;
   const bodyWidth = 465;
 
+  const SIGNATURE_FOOTER_TOP = 200;
+  const PAGE1_NO_SIG_BOTTOM = 80;
+  const CONTINUATION_TOP_OFFSET = 200;
+
+  const addressLines = (document.receiverAddress ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const subjectText = `${subjectPrefix} ${String(document.heading ?? document.description ?? "Official Letter").toUpperCase()}`;
+  const subjectLines = wrapTextByWidth(
+    subjectText,
+    boldFont,
+    fontSize,
+    bodyWidth,
+  );
+
+  const { customMessage } = splitLetterBody(document.body);
+  const messageParagraphs = customMessage
+    ? customMessage
+        .split(/\n\n+/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+    : [];
+
+  type BodyLine = { text: string; justified: boolean; isSpacer: boolean };
+  const bodyLines: BodyLine[] = [];
+  for (const paragraph of messageParagraphs) {
+    const wrappedLines = wrapTextByWidth(
+      paragraph,
+      regularFont,
+      fontSize,
+      bodyWidth,
+    );
+    for (let i = 0; i < wrappedLines.length; i++) {
+      bodyLines.push({
+        text: wrappedLines[i],
+        justified: i < wrappedLines.length - 1,
+        isSpacer: false,
+      });
+    }
+    bodyLines.push({ text: "", justified: false, isSpacer: true });
+  }
+  if (bodyLines.length > 0 && bodyLines[bodyLines.length - 1].isSpacer) {
+    bodyLines.pop();
+  }
+
+  const letterHTemplateBytes = await loadTemplateBytes("LETTER H.pdf");
+  const letterHTemplateDoc = await PDFDocument.load(letterHTemplateBytes);
+  const referencePage = letterHTemplateDoc.getPages()[0];
+  const pageWidth = referencePage.getWidth();
+  const pageHeight = referencePage.getHeight();
+
+  const headerStartY = pageHeight - 258;
+  const bodyFirstY =
+    headerStartY -
+    lineSpacing * (5 + addressLines.length + subjectLines.length);
+
+  const lastBodyLineY =
+    bodyLines.length === 0
+      ? bodyFirstY
+      : bodyFirstY - (bodyLines.length - 1) * lineSpacing;
+  const fitsSinglePage = lastBodyLineY >= SIGNATURE_FOOTER_TOP;
+
+  const page1TemplateName = fitsSinglePage
+    ? "LETTER H.pdf"
+    : "LETTER_TEMPLATE_1.pdf";
+  const page1TemplateBytes = await loadTemplateBytes(page1TemplateName);
+  const page1TemplateDoc = await PDFDocument.load(page1TemplateBytes);
+  const [page1] = await pdfDoc.copyPages(page1TemplateDoc, [0]);
+  pdfDoc.addPage(page1);
+
   const dateText = formatDisplayDate(document.letterDate);
   const referenceText = `REF: ${document.referenceNumber?.trim() || "-"}`;
   const referenceSize = 10.5;
-  const referenceWidth = boldFont.widthOfTextAtSize(referenceText, referenceSize);
-  page.drawText(referenceText.toUpperCase(), {
+  const referenceWidth = boldFont.widthOfTextAtSize(
+    referenceText,
+    referenceSize,
+  );
+  page1.drawText(referenceText.toUpperCase(), {
     x: pageWidth - rightMargin - referenceWidth,
     y: pageHeight - 192,
     size: referenceSize,
@@ -192,8 +273,7 @@ export async function buildFormalLetterPdf(
 
   const dateSize = 12.5;
   const dateWidth = boldFont.widthOfTextAtSize(dateText, dateSize);
-
-  page.drawText(dateText.toUpperCase(), {
+  page1.drawText(dateText.toUpperCase(), {
     x: pageWidth - rightMargin - dateWidth,
     y: pageHeight - 210,
     size: dateSize,
@@ -201,11 +281,8 @@ export async function buildFormalLetterPdf(
     color: dark,
   });
 
-  let cursorY = pageHeight - 258;
-  const fontSize = 12;
-  const lineSpacing = fontSize * 1.5;
-
-  page.drawText("TO:", {
+  let cursorY = headerStartY;
+  page1.drawText(recipientLabel, {
     x: leftX,
     y: cursorY,
     size: fontSize,
@@ -214,7 +291,7 @@ export async function buildFormalLetterPdf(
   });
 
   cursorY -= lineSpacing;
-  page.drawText(document.name, {
+  page1.drawText(document.name, {
     x: leftX,
     y: cursorY,
     size: fontSize,
@@ -222,14 +299,9 @@ export async function buildFormalLetterPdf(
     color: dark,
   });
 
-  const addressLines = (document.receiverAddress ?? "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
   for (const line of addressLines) {
     cursorY -= lineSpacing;
-    page.drawText(line, {
+    page1.drawText(line, {
       x: leftX,
       y: cursorY,
       size: fontSize,
@@ -239,7 +311,7 @@ export async function buildFormalLetterPdf(
   }
 
   cursorY -= lineSpacing * 1.5;
-  page.drawText("Dear Sir/Madam.", {
+  page1.drawText(greeting, {
     x: leftX,
     y: cursorY,
     size: fontSize,
@@ -248,102 +320,85 @@ export async function buildFormalLetterPdf(
   });
 
   cursorY -= lineSpacing * 1.5;
-  const subjectText = `RE: ${String(document.heading ?? document.description ?? "Official Letter").toUpperCase()}`;
-  const subjectLines = wrapTextByWidth(
-    subjectText,
-    boldFont,
-    fontSize,
-    bodyWidth,
-  );
-
   for (const line of subjectLines) {
-    page.drawText(line, {
+    page1.drawText(line, {
       x: leftX,
       y: cursorY,
       size: fontSize,
       font: boldFont,
       color: dark,
     });
-
     const lineWidth = boldFont.widthOfTextAtSize(line, fontSize);
-    page.drawLine({
+    page1.drawLine({
       start: { x: leftX, y: cursorY - 2 },
       end: { x: leftX + lineWidth, y: cursorY - 2 },
       thickness: 0.8,
       color: dark,
     });
-
     cursorY -= lineSpacing;
   }
 
   cursorY -= lineSpacing;
-  const { customMessage } = splitLetterBody(document.body);
-  const messageParagraphs = customMessage
-    ? customMessage
-        .split(/\n\n+/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-    : [];
 
-  for (const paragraph of messageParagraphs) {
-    const wrappedLines = wrapTextByWidth(
-      paragraph,
-      regularFont,
-      fontSize,
-      bodyWidth,
-    );
-    for (let i = 0; i < wrappedLines.length; i++) {
-      const line = wrappedLines[i];
-      const isLastLine = i === wrappedLines.length - 1;
-
-      if (isLastLine) {
-        page.drawText(line, {
-          x: leftX,
-          y: cursorY,
-          size: fontSize,
-          font: regularFont,
-          color: dark,
-        });
-      } else {
-        const words = line.split(/\s+/).filter(Boolean);
-        if (words.length > 1) {
-          const totalWordsWidth = words.reduce(
-            (acc, word) => acc + regularFont.widthOfTextAtSize(word, fontSize),
-            0,
-          );
-          const totalSpaceWidth = bodyWidth - totalWordsWidth;
-          const spaceWidth = totalSpaceWidth / (words.length - 1);
-
-          let currentX = leftX;
-          for (let j = 0; j < words.length; j++) {
-            page.drawText(words[j], {
-              x: currentX,
-              y: cursorY,
-              size: fontSize,
-              font: regularFont,
-              color: dark,
-            });
-            currentX +=
-              regularFont.widthOfTextAtSize(words[j], fontSize) + spaceWidth;
-          }
-        } else {
-          page.drawText(line, {
-            x: leftX,
-            y: cursorY,
+  type LetterPage = ReturnType<typeof pdfDoc.addPage>;
+  const drawBodyLine = (page: LetterPage, line: BodyLine, y: number) => {
+    if (line.isSpacer || !line.text) {
+      return;
+    }
+    if (line.justified) {
+      const words = line.text.split(/\s+/).filter(Boolean);
+      if (words.length > 1) {
+        const totalWordsWidth = words.reduce(
+          (acc, word) => acc + regularFont.widthOfTextAtSize(word, fontSize),
+          0,
+        );
+        const spaceWidth = (bodyWidth - totalWordsWidth) / (words.length - 1);
+        let currentX = leftX;
+        for (const word of words) {
+          page.drawText(word, {
+            x: currentX,
+            y,
             size: fontSize,
             font: regularFont,
             color: dark,
           });
+          currentX +=
+            regularFont.widthOfTextAtSize(word, fontSize) + spaceWidth;
         }
+        return;
       }
-      cursorY -= lineSpacing;
     }
-    cursorY -= lineSpacing; // Paragraph spacing
+    page.drawText(line.text, {
+      x: leftX,
+      y,
+      size: fontSize,
+      font: regularFont,
+      color: dark,
+    });
+  };
+
+  let currentPage: LetterPage = page1;
+  let currentLimitY = fitsSinglePage
+    ? SIGNATURE_FOOTER_TOP
+    : PAGE1_NO_SIG_BOTTOM;
+  let switchedToPage2 = false;
+
+  for (const line of bodyLines) {
+    if (!fitsSinglePage && !switchedToPage2 && cursorY < currentLimitY) {
+      const page2TemplateBytes = await loadTemplateBytes("LETTER H.pdf");
+      const page2TemplateDoc = await PDFDocument.load(page2TemplateBytes);
+      const [page2] = await pdfDoc.copyPages(page2TemplateDoc, [0]);
+      pdfDoc.addPage(page2);
+      currentPage = page2;
+      cursorY = pageHeight - CONTINUATION_TOP_OFFSET;
+      currentLimitY = SIGNATURE_FOOTER_TOP;
+      switchedToPage2 = true;
+    }
+    drawBodyLine(currentPage, line, cursorY);
+    cursorY -= lineSpacing;
   }
 
-  if (document.status === "approved") {
-    // The template has "Yours faithfully," and "Pendo Joseph Oweru."
-    // We target the blank space between them dynamically maintaining aspect ratio.
+  if (document.status === "approved" && opts.includeSignature) {
     const boundingX = leftX - 10;
     const boundingY = 120;
     const boxWidth = 145;
@@ -357,19 +412,13 @@ export async function buildFormalLetterPdf(
     for (const signaturePath of uniqueSignatureCandidates) {
       try {
         const signatureImage = await embedSignatureImage(pdfDoc, signaturePath);
-
-        // Scale proportionally so the signature is not squished or stretched
         const dims = signatureImage.scaleToFit(boxWidth, boxHeight);
-
-        // Position it centered inside that target blank space
-        page.drawImage(signatureImage, {
+        currentPage.drawImage(signatureImage, {
           x: boundingX + (boxWidth - dims.width) / 2,
           y: boundingY + (boxHeight - dims.height) / 2,
           width: dims.width,
           height: dims.height,
         });
-
-        // Do not draw duplicate hardcoded text as template handles it
         break;
       } catch {
         // Try next candidate path.

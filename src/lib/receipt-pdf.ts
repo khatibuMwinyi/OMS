@@ -3,8 +3,12 @@ import path from "node:path";
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
-import { FIXED_BANK_ACCOUNT_NAME, FIXED_BANK_ACCOUNT_NUMBER } from "@/lib/payment-defaults";
-import type { ReceiptRecord } from "@/lib/records";
+import {
+  FIXED_BANK_ACCOUNT_NAME,
+  FIXED_BANK_ACCOUNT_NUMBER,
+  FIXED_BANK_NAME,
+} from "@/lib/payment-defaults";
+import type { ReceiptItemRecord, ReceiptRecord } from "@/lib/records";
 
 const templateBytesCache = new Map<string, Promise<Uint8Array>>();
 
@@ -109,7 +113,7 @@ function drawStackedField(
   });
 }
 
-export async function buildReceiptPdf(document: ReceiptRecord) {
+export async function buildReceiptPdf(document: ReceiptRecord, items: ReceiptItemRecord[] = []) {
   const pdfDoc = await PDFDocument.create();
   const templateBytes = await loadTemplateBytes();
   const templateDoc = await PDFDocument.load(templateBytes);
@@ -225,6 +229,37 @@ export async function buildReceiptPdf(document: ReceiptRecord) {
       text,
       muted,
     );
+  } else if (document.paymentMethod === "Bank Deposit") {
+    drawStackedField(
+      page,
+      { bold: boldFont, regular: regularFont },
+      rightLabelX,
+      pageHeight - 350,
+      "Account name",
+      FIXED_BANK_ACCOUNT_NAME,
+      text,
+      muted,
+    );
+    drawStackedField(
+      page,
+      { bold: boldFont, regular: regularFont },
+      rightLabelX,
+      pageHeight - 420,
+      "Account number",
+      FIXED_BANK_ACCOUNT_NUMBER,
+      text,
+      muted,
+    );
+    drawStackedField(
+      page,
+      { bold: boldFont, regular: regularFont },
+      rightLabelX,
+      pageHeight - 490,
+      "Depositor",
+      document.depositorName || "-",
+      text,
+      muted,
+    );
   } else if (document.paymentMethod === "Mobile Money" && document.referenceNumber) {
     drawStackedField(
       page,
@@ -238,16 +273,18 @@ export async function buildReceiptPdf(document: ReceiptRecord) {
     );
   }
 
-  // Body Table Section (Precisely like Invoice)
+  // Body Table Section
   const tableLeftX = 68;
-  const tableRightMax = 380;
+  const tableRightMax = 560;
   const tableFullWidth = tableRightMax - tableLeftX;
-  
-  const itemX = tableLeftX;
-  const totalX = tableLeftX + 280;
-  const headerY = 550;
 
-  // Header Background 
+  const descColX = tableLeftX;
+  const qtyColX = tableLeftX + 290;
+  const unitColX = tableLeftX + 360;
+  const totalColX = tableLeftX + 440;
+  const headerY = 530;
+
+  // Header background
   page.drawRectangle({
     x: tableLeftX,
     y: headerY - 10,
@@ -256,61 +293,109 @@ export async function buildReceiptPdf(document: ReceiptRecord) {
     color: rgb(0.96, 0.97, 1),
   });
 
-  page.drawText("Item description", {
-    x: itemX + 5,
+  page.drawText("Description", {
+    x: descColX + 5,
     y: headerY,
-    size: 11.5,
+    size: 10,
+    font: boldFont,
+    color: text,
+  });
+  page.drawText("Qty", {
+    x: qtyColX,
+    y: headerY,
+    size: 10,
+    font: boldFont,
+    color: text,
+  });
+  page.drawText("Unit Price", {
+    x: unitColX,
+    y: headerY,
+    size: 10,
+    font: boldFont,
+    color: text,
+  });
+  page.drawText("Total", {
+    x: totalColX,
+    y: headerY,
+    size: 10,
     font: boldFont,
     color: text,
   });
 
-  const headerTotalWidth = boldFont.widthOfTextAtSize("Total", 11.5);
-  page.drawText("Total", {
-    x: totalX + (25 - headerTotalWidth / 2),
-    y: headerY,
-    size: 11.5,
-    font: boldFont,
-    color: text,
-  });
+  // Render rows — fall back to document fields if no items (legacy receipts)
+  const renderItems =
+    items.length > 0
+      ? items
+      : [
+          {
+            description: document.description || "Payment for services",
+            category: document.category || null,
+            location: null,
+            quantity: 1,
+            unitPrice: Number(document.amount),
+            total: Number(document.amount),
+          },
+        ];
 
   let rowY = headerY - 35;
-  const rowGap = 35;
-  
-  // Zebra striping for single row
-  page.drawRectangle({
-    x: tableLeftX,
-    y: rowY - 12,
-    width: tableFullWidth,
-    height: rowGap,
-    color: rgb(0.98, 0.99, 1),
-  });
+  const rowGap = 30;
 
-  const description = `${document.description || "Payment for services"} (${document.category || "General"})`;
-  const descriptionLines = wrapTextByWidth(description, regularFont, 11, 250);
-  
-  descriptionLines.forEach((line, index) => {
-    page.drawText(line, {
-      x: itemX + 5,
-      y: rowY - index * 14,
-      size: 11,
+  for (let i = 0; i < renderItems.length; i++) {
+    const item = renderItems[i];
+    const itemTotal = item.quantity * item.unitPrice;
+
+    if (i % 2 === 0) {
+      page.drawRectangle({
+        x: tableLeftX,
+        y: rowY - 10,
+        width: tableFullWidth,
+        height: rowGap,
+        color: rgb(0.98, 0.99, 1),
+      });
+    }
+
+    const descText =
+      item.category
+        ? `${item.description} (${item.category})`
+        : item.description;
+    const descLines = wrapTextByWidth(descText, regularFont, 10, 270);
+
+    descLines.forEach((line, li) => {
+      page.drawText(line, {
+        x: descColX + 5,
+        y: rowY - li * 13,
+        size: 10,
+        font: regularFont,
+        color: text,
+      });
+    });
+
+    page.drawText(String(item.quantity), {
+      x: qtyColX,
+      y: rowY,
+      size: 10,
       font: regularFont,
       color: text,
     });
-  });
+    page.drawText(formatAmount(item.unitPrice), {
+      x: unitColX,
+      y: rowY,
+      size: 10,
+      font: regularFont,
+      color: text,
+    });
+    page.drawText(formatAmount(itemTotal), {
+      x: totalColX,
+      y: rowY,
+      size: 10,
+      font: boldFont,
+      color: text,
+    });
 
-  const itemTotalStr = formatAmount(Number(document.amount));
-  const itemTotalWidth = boldFont.widthOfTextAtSize(itemTotalStr, 11);
-  page.drawText(itemTotalStr, {
-    x: totalX + (25 - itemTotalWidth / 2),
-    y: rowY,
-    size: 11,
-    font: boldFont,
-    color: text,
-  });
+    rowY -= Math.max(rowGap, descLines.length * 13 + 8);
+  }
 
-  rowY -= Math.max(rowGap, descriptionLines.length * 14 + 10);
-
-  const dividerY = rowY + 15;
+  const dividerY = rowY + 14;
   page.drawLine({
     start: { x: tableLeftX, y: dividerY },
     end: { x: tableLeftX + tableFullWidth, y: dividerY },
@@ -318,52 +403,56 @@ export async function buildReceiptPdf(document: ReceiptRecord) {
     color: rgb(0.9, 0.9, 0.95),
   });
 
-  const summaryLabelX = tableLeftX + 200;
-  const summaryValueOpenX = tableLeftX + 280;
-  let summaryY = rowY - 20;
+  const grandTotal = renderItems.reduce(
+    (sum, item) => sum + item.quantity * item.unitPrice,
+    0,
+  );
+
+  const summaryLabelX = totalColX - 80;
+  let summaryY = rowY - 18;
 
   page.drawText("Subtotal", {
     x: summaryLabelX,
     y: summaryY,
-    size: 11,
+    size: 10,
     font: regularFont,
     color: muted,
   });
-  page.drawText(formatAmount(Number(document.amount)), {
-    x: summaryValueOpenX,
+  page.drawText(formatAmount(grandTotal), {
+    x: totalColX,
     y: summaryY,
-    size: 11.5,
+    size: 10,
     font: regularFont,
     color: text,
   });
 
-  summaryY -= 35;
-  // Total Highlight within white section (Navy box like Invoice)
-  const totalBoxWidth = 165;
-  const totalBoxX = 412 - totalBoxWidth;
+  summaryY -= 30;
+
+  const totalBoxWidth = 180;
+  const totalBoxX = tableRightMax - totalBoxWidth;
 
   page.drawRectangle({
     x: totalBoxX,
     y: summaryY - 8,
     width: totalBoxWidth,
-    height: 30,
+    height: 28,
     color: rgb(0.1, 0.12, 0.18),
   });
 
   page.drawText("Total Paid", {
     x: totalBoxX + 8,
-    y: summaryY + 5,
-    size: 10.5,
+    y: summaryY + 4,
+    size: 10,
     font: boldFont,
     color: rgb(1, 1, 1),
   });
-  
-  const totalStr = formatCurrency(Number(document.amount));
-  const totalValueWidth = boldFont.widthOfTextAtSize(totalStr, 11.5);
+
+  const totalStr = formatCurrency(grandTotal);
+  const totalValueWidth = boldFont.widthOfTextAtSize(totalStr, 10.5);
   page.drawText(totalStr, {
-    x: 412 - totalValueWidth - 8,
-    y: summaryY + 5,
-    size: 11.5,
+    x: tableRightMax - totalValueWidth - 8,
+    y: summaryY + 4,
+    size: 10.5,
     font: boldFont,
     color: rgb(1, 1, 1),
   });

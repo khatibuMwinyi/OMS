@@ -209,22 +209,23 @@ export async function buildInvoicePdf(
   const mobileOperator = FIXED_MOBILE_OPERATOR;
   const mobileNumber = FIXED_MOBILE_NUMBER;
   const mobileHolderName = FIXED_MOBILE_HOLDER_NAME;
-  const paymentHeading =
-    paymentMethod === "Bank Transfer"
-      ? bankName
-      : paymentMethod === "Mobile Money"
-        ? mobileOperator
-        : "Cash";
+  const isBankBranch =
+    paymentMethod === "Bank Transfer" || paymentMethod === "Bank Deposit";
+  const paymentHeading = isBankBranch
+    ? bankName
+    : paymentMethod === "Mobile Money"
+      ? mobileOperator
+      : "Cash";
   const accountName =
     paymentMethod === "Mobile Money"
       ? mobileHolderName
-      : paymentMethod === "Bank Transfer"
+      : isBankBranch
         ? bankAccountName
         : "-";
   const accountNumber =
     paymentMethod === "Mobile Money"
       ? mobileNumber
-      : paymentMethod === "Bank Transfer"
+      : isBankBranch
         ? bankAccountNumber
         : "-";
 
@@ -268,7 +269,13 @@ export async function buildInvoicePdf(
     font: boldFont,
     color: text,
   });
-  page.drawText(`${paymentMethod} · ${paymentHeading}`, {
+  const paymentHeadingLine =
+    paymentMethod === "Bank Deposit" && document.invoice.depositorName
+      ? `${paymentMethod} (Depositor: ${document.invoice.depositorName})`
+      : paymentMethod === "Bank Deposit"
+        ? `${paymentMethod}`
+        : `${paymentMethod} · ${paymentHeading}`;
+  page.drawText(paymentHeadingLine, {
     x: rightLabelX,
     y: pageHeight - 224,
     size: 11,
@@ -377,8 +384,15 @@ export async function buildInvoicePdf(
       });
     }
 
-    const descriptionLines = wrapTextByWidth(
+    const descriptionParts = [
+      item.category ? `[${item.category}]` : "",
       item.description,
+      item.location ? `(${item.location})` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const descriptionLines = wrapTextByWidth(
+      descriptionParts,
       regularFont,
       11,
       150,

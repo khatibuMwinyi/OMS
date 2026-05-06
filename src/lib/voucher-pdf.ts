@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
+import { FIXED_BANK_NAME } from "@/lib/payment-defaults";
 import type { VoucherRecord } from "@/lib/records";
 
 const templateBytesCache = new Map<string, Promise<Uint8Array>>();
@@ -224,6 +225,37 @@ export async function buildVoucherPdf(document: VoucherRecord) {
       pageHeight - 490,
       "Bank Reference",
       document.bankReference || "-",
+      text,
+      muted,
+    );
+  } else if (document.paymentMethod === "Bank Deposit") {
+    drawStackedField(
+      page,
+      { bold: boldFont, regular: regularFont },
+      rightLabelX,
+      pageHeight - 350,
+      "Account name",
+      document.accountName || "-",
+      text,
+      muted,
+    );
+    drawStackedField(
+      page,
+      { bold: boldFont, regular: regularFont },
+      rightLabelX,
+      pageHeight - 420,
+      "Account number",
+      document.accountNumber || "-",
+      text,
+      muted,
+    );
+    drawStackedField(
+      page,
+      { bold: boldFont, regular: regularFont },
+      rightLabelX,
+      pageHeight - 490,
+      "Depositor",
+      document.depositorName || "-",
       text,
       muted,
     );
