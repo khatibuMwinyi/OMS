@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Pencil, Trash2, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -27,10 +27,41 @@ export function OfficeItemsPanel({ items, canEdit }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
 
-  const monthlyItems = items.filter(i => i.recurrence === "monthly");
-  const yearlyItems = items.filter(i => i.recurrence === "yearly");
+  // Filter state: default to "all"
+  const [currentFilter, setCurrentFilter] = useState<"all" | "monthly" | "yearly">("all");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Page size: 5 for "all", 10 for specific filters
+  const pageSize = currentFilter === "all" ? 5 : 10;
+
+  // Filter items in-memory (no server call)
+  const filteredItems = useMemo(() => {
+    if (currentFilter === "all") return items;
+    return items.filter(i => i.recurrence === currentFilter);
+  }, [items, currentFilter]);
+
+  // Paginate filtered items
+  const totalPages = Math.ceil(filteredItems.length / pageSize);
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredItems.slice(start, start + pageSize);
+  }, [filteredItems, currentPage, pageSize]);
+
+  // Separate monthly and yearly for display within current page
+  const monthlyItems = paginatedItems.filter(i => i.recurrence === "monthly");
+  const yearlyItems = paginatedItems.filter(i => i.recurrence === "yearly");
 
   const editingItem = editId ? items.find(i => i.id === editId) : null;
+
+  // Reset page when filter changes
+  function handleFilterChange(newFilter: "all" | "monthly" | "yearly") {
+    setCurrentFilter(newFilter);
+    setCurrentPage(1);
+  }
+
+  function handlePageChange(newPage: number) {
+    setCurrentPage(newPage);
+  }
 
   return (
     <div>
@@ -100,6 +131,33 @@ export function OfficeItemsPanel({ items, canEdit }: Props) {
           </form>
         </section>
       )}
+
+      {/* Filter buttons */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+        <div className="pill-group">
+          <button
+            type="button"
+            className={`pill${currentFilter === "all" ? " pill--gold" : ""}`}
+            onClick={() => handleFilterChange("all")}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            className={`pill${currentFilter === "monthly" ? " pill--gold" : ""}`}
+            onClick={() => handleFilterChange("monthly")}
+          >
+            Monthly
+          </button>
+          <button
+            type="button"
+            className={`pill${currentFilter === "yearly" ? " pill--gold" : ""}`}
+            onClick={() => handleFilterChange("yearly")}
+          >
+            Yearly
+          </button>
+        </div>
+      </div>
 
       {/* Items Table */}
       <section className="section-card">
@@ -188,6 +246,31 @@ export function OfficeItemsPanel({ items, canEdit }: Props) {
           </div>
         )}
       </section>
+
+      {/* Pagination controls */}
+      {totalPages > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 16, marginTop: 16 }}>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={currentPage <= 1}
+            onClick={() => handlePageChange(currentPage - 1)}
+          >
+            Previous
+          </Button>
+          <span style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>
+            Page {currentPage} of {totalPages}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={currentPage >= totalPages}
+            onClick={() => handlePageChange(currentPage + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

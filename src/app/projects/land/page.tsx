@@ -9,7 +9,6 @@ import {
   listProjectsBySequence,
   listProjectRevenues,
   listProjectCosts,
-  listOfficeExpensesBySequence,
   listOfficeExpenseItems,
   calculateProjectReport,
   computeAnnualOfficeBurden,
@@ -20,7 +19,7 @@ import {
 import { LandProjectForms } from "@/components/projects/LandProjectForms";
 import { OfficeItemsPanel } from "@/components/projects/OfficeItemsPanel";
 import { completeProjectAction } from "@/app/actions/projects";
-import { OfficeExpensePanel } from "@/components/projects/OfficeExpensePanel";
+import { LandProjectTabs } from "./LandProjectTabs";
 
 type Props = {
   searchParams: Promise<{
@@ -30,6 +29,8 @@ type Props = {
     status?: string;
     error?: string;
     create?: string;
+    filter?: string;
+    page?: string;
   }>;
 };
 
@@ -66,13 +67,14 @@ export default async function LandProjectPage({ searchParams }: Props) {
   const selectedProject =
     projects.find((p) => p.id === selectedProjectId) ?? projects[0] ?? null;
 
-  // Sequence-level office expenses + master items list
-  const seqOfficeExpenses = activeSeqId
-    ? await listOfficeExpensesBySequence(activeSeqId)
-    : [];
-  const officeItems = await listOfficeExpenseItems();
-  const seqOfficeTotal = seqOfficeExpenses.reduce((s, e) => s + Number(e.amount), 0);
+  // Master items list for computing burden
+  const officeItemsResult = await listOfficeExpenseItems("all", 1, 1000);
+  const officeItems = officeItemsResult.items;
   const N = activeSeq ? Math.max(1, Number(activeSeq.totalProjects)) : 4;
+
+  // Annual office burden (sum monthly × 12 + sum yearly) and per-project share
+  const burden = computeAnnualOfficeBurden(officeItems);
+  const annualPerProjectShare = burden.annual / N;
 
   // Build financial reports for all projects in sequence
   const reports: ProjectFinancialReport[] = [];
@@ -81,9 +83,9 @@ export default async function LandProjectPage({ searchParams }: Props) {
       listProjectRevenues(proj.id),
       listProjectCosts(proj.id),
     ]);
-    // Active projects: use sequence-level office expenses; completed projects use snapshot.
+    // Active projects: use Annual Office Burden; completed projects use snapshot.
     const officeForCalc =
-      proj.status === "completed" ? [] : [{ amount: seqOfficeTotal }];
+      proj.status === "completed" ? [] : [{ amount: burden.annual }];
     reports.push(
       calculateProjectReport(proj, revs, costs, officeForCalc, {
         sequenceTotalProjects: N,
@@ -91,14 +93,7 @@ export default async function LandProjectPage({ searchParams }: Props) {
     );
   }
 
-  const totalLandCost = projects.reduce((s, p) => s + Number(p.landCost), 0);
-  const totalOfficeAlloc = reports.reduce((s, r) => s + r.officeAllocation, 0);
   const latestReport = reports.find((r) => r.projectId === selectedProject?.id);
-  const runningCapital = activeSeq ? Number(activeSeq.currentCapital) : 0;
-
-  // Annual office burden (sum monthly × 12 + sum yearly) and per-project share
-  const burden = computeAnnualOfficeBurden(officeItems);
-  const annualPerProjectShare = burden.annual / N;
 
   const tab = params.tab ?? "overview";
   const showCreate = params.create === "1";
@@ -125,6 +120,31 @@ export default async function LandProjectPage({ searchParams }: Props) {
           </Link>
         </section>
 
+        {/* ── Stat cards ── */}
+        <section className="summary-grid">
+          <div className="stat-card section-card">
+            <p className="stat-label">Land Cost</p>
+            <p className="stat-value">
+              {latestReport ? `TZS ${fmt(latestReport.landCost)}` : "—"}
+            </p>
+            <p className="stat-detail">selected project</p>
+          </div>
+          <div className="stat-card section-card">
+            <p className="stat-label">Office Allocation</p>
+            <p className="stat-value">TZS {fmt(annualPerProjectShare)}</p>
+            <p className="stat-detail">
+              1/{N} = {((1 / N) * 100).toFixed(0)}% of annual burden
+            </p>
+          </div>
+          <div className="stat-card section-card">
+            <p className="stat-label">Net Profit</p>
+            <p className="stat-value">
+              {latestReport ? `TZS ${fmt(Math.max(0, latestReport.netProfit))}` : "—"}
+            </p>
+            <p className="stat-detail">selected project</p>
+          </div>
+        </section>
+
         {/* ── Flash messages ── */}
         <RouteToast status={params.status} error={params.error} />
 
@@ -144,42 +164,10 @@ export default async function LandProjectPage({ searchParams }: Props) {
           </section>
         )}
 
-        {/* ── Stat cards ── */}
-        <section className="summary-grid">
-          <div className="stat-card section-card">
-            <p className="stat-label">Land Cost (total)</p>
-            <p className="stat-value">TZS {fmt(totalLandCost)}</p>
-            <p className="stat-detail">across all projects</p>
-          </div>
-          <div className="stat-card section-card">
-            <p className="stat-label">Office Allocation</p>
-            <p className="stat-value">TZS {fmt(totalOfficeAlloc)}</p>
-            <p className="stat-detail">
-              {((1 / N) * 100).toFixed(0)}% × recorded office expenses (1/{N})
-            </p>
-          </div>
-          <div className="stat-card section-card">
-            <p className="stat-label">Net Profit</p>
-            <p className="stat-value">
-              {latestReport ? `TZS ${fmt(Math.max(0, latestReport.netProfit))}` : "—"}
-            </p>
-            <p className="stat-detail">selected project</p>
-          </div>
-          <div className="stat-card section-card">
-            <p className="stat-label">Running Capital</p>
-            <p className="stat-value">TZS {fmt(runningCapital)}</p>
-            <p className="stat-detail">
-              {activeSeq
-                ? `${activeSeq.completedProjects} of ${activeSeq.totalProjects} complete`
-                : "no active sequence"}
-            </p>
-          </div>
-        </section>
-
         {/* ── Annual office burden card row ── */}
         <section className="summary-grid" style={{ marginTop: 12 }}>
           <div className="stat-card section-card">
-            <p className="stat-label">Annual Office Burden</p>
+            <p className="stat-label">Annual Office Burden (Base)</p>
             <p className="stat-value">TZS {fmt(burden.annual)}</p>
             <p className="stat-detail">
               monthly × 12 (TZS {fmt(burden.monthlySum * 12)}) + yearly (TZS{" "}
@@ -187,19 +175,21 @@ export default async function LandProjectPage({ searchParams }: Props) {
             </p>
           </div>
           <div className="stat-card section-card">
-            <p className="stat-label">Per Project Annual Share</p>
-            <p className="stat-value">TZS {fmt(annualPerProjectShare)}</p>
+            <p className="stat-label">Project Costs (Actuals)</p>
+            <p className="stat-value">
+              {latestReport ? `TZS ${fmt(latestReport.projectCosts)}` : "—"}
+            </p>
             <p className="stat-detail">
-              1/{N} = {((1 / N) * 100).toFixed(0)}% of annual burden
+              selected project actuals
             </p>
           </div>
           <div className="stat-card section-card">
-            <p className="stat-label">Monthly items</p>
+            <p className="stat-label">Monthly Items Base</p>
             <p className="stat-value">TZS {fmt(burden.monthlySum)}/mo</p>
             <p className="stat-detail">{officeItems.filter((i) => i.recurrence === "monthly").length} items</p>
           </div>
           <div className="stat-card section-card">
-            <p className="stat-label">Yearly items</p>
+            <p className="stat-label">Yearly Items Base</p>
             <p className="stat-value">TZS {fmt(burden.yearlySum)}/yr</p>
             <p className="stat-detail">{officeItems.filter((i) => i.recurrence === "yearly").length} items</p>
           </div>
@@ -239,9 +229,6 @@ export default async function LandProjectPage({ searchParams }: Props) {
                 }}
               >
                 {seq.name}
-                <span style={{ marginLeft: 6, opacity: 0.5, fontSize: "0.78rem" }}>
-                  {seq.completedProjects}/{seq.totalProjects}
-                </span>
               </Link>
             ))}
           </div>
@@ -262,36 +249,11 @@ export default async function LandProjectPage({ searchParams }: Props) {
         {activeSeq && (
           <section className="section-card" style={{ marginTop: 0, borderRadius: "0 12px 12px 12px" }}>
             {/* ── Inner tabs ── */}
-            <div
-              style={{
-                display: "flex",
-                gap: 4,
-                marginBottom: 18,
-                borderBottom: "1px solid rgba(148,163,184,0.14)",
-                paddingBottom: 12,
-              }}
-            >
-              {(
-                [
-                  { key: "overview", label: "Overview" },
-                  { key: "flow", label: "Financial Flow" },
-                  { key: "report", label: "Full Report" },
-                  { key: "entries", label: "Add Entry" },
-                  { key: "office", label: "Office Expenses" },
-                  { key: "office-items", label: "Office Items" },
-                  { key: "add-project", label: "+ Next Project" },
-                ] as const
-              ).map(({ key, label }) => (
-                <Link
-                  key={key}
-                  href={`/projects/land?seq=${activeSeqId}${selectedProject ? `&project=${selectedProject.id}` : ""}&tab=${key}`}
-                  className={`pill${tab === key ? " pill--gold" : ""}`}
-                  style={{ fontSize: "0.82rem" }}
-                >
-                  {label}
-                </Link>
-              ))}
-            </div>
+            <LandProjectTabs
+              activeSeqId={activeSeqId!}
+              selectedProjectId={selectedProject?.id ?? null}
+              initialTab={tab}
+            />
 
             {/* ── TAB: Overview ── */}
             {tab === "overview" && (
@@ -537,17 +499,6 @@ export default async function LandProjectPage({ searchParams }: Props) {
               </div>
             )}
 
-            {/* ── TAB: Office Expenses (sequence-level) ── */}
-            {tab === "office" && activeSeqId && (
-              <OfficeExpensePanel
-                sequenceId={activeSeqId}
-                sequenceTotalProjects={N}
-                items={officeItems}
-                entries={seqOfficeExpenses}
-                canDelete={session.role === "admin" || session.role === "director"}
-              />
-            )}
-
             {/* ── TAB: Office Items (master items) ── */}
             {tab === "office-items" && (
               <OfficeItemsPanel
@@ -597,43 +548,43 @@ function FinancialFlowView({
   }
 
   const rows = [
-    { step: "1", label: "Revenue", formula: "R = total sales", amount: report.totalRevenue, positive: true },
+    { step: "1", label: "Revenue", formula: "Total Sales", amount: report.totalRevenue, positive: true },
     {
       step: "2",
-      label: "Land Cost + Project Costs",
+      label: "Land Cost & Project Costs",
       formula: `L (${fmt(report.landCost)}) + PC (${fmt(report.projectCosts)})`,
       amount: -(report.landCost + report.projectCosts),
       positive: false,
     },
-    { step: "=", label: "Gross Profit", formula: "R − (L + PC)", amount: report.grossProfit, positive: true, subtotal: true },
+    { step: "=", label: "Gross Profit", formula: "Revenue − (Land + Project Costs)", amount: report.grossProfit, positive: true, subtotal: true },
     {
       step: "3",
-      label: "Office Allocation (25%)",
-      formula: `0.25 × OE (${fmt(report.officeExpenses)})`,
+      label: "Office Allocation & Running Capital",
+      formula: `25% of Sequence Budget (${fmt(report.officeExpenses)})`,
       amount: -report.officeAllocation,
       positive: false,
     },
     { step: "=", label: "Net Profit", formula: "Gross Profit − Office Allocation", amount: Math.max(0, report.netProfit), positive: true, subtotal: true },
-    { step: "5", label: "Tithe (10%)", formula: "0.10 × Net Profit", amount: -report.tithe, positive: false },
+    { step: "4", label: "Tithe (10%)", formula: "10% of Net Profit", amount: -report.tithe, positive: false },
     {
-      step: "6",
+      step: "5",
       label: "Debt Payment (20%)",
-      formula: "0.20 × (Net Profit − Tithe)",
+      formula: "20% of (Net Profit − Tithe)",
       amount: -report.debtPayment,
       positive: false,
     },
     {
       step: "=",
       label: "Retained Earnings",
-      formula: "Net Profit − Tithe − Debt",
+      formula: "Net Profit − (Tithe + Debt)",
       amount: report.retainedEarnings,
       positive: true,
       result: true,
     },
     {
-      step: "8",
+      step: "6",
       label: "New Running Capital",
-      formula: `Old Capital (${fmt(report.runningCapitalBefore)}) + Retained`,
+      formula: `Previous Balance (${fmt(report.runningCapitalBefore)}) + Retained Earnings`,
       amount: report.runningCapitalAfter,
       positive: true,
       capital: true,

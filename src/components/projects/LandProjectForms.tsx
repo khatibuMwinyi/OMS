@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { Input } from "@/components/ui/input";
+import { FormattedNumberInput } from "@/components/ui/formatted-number-input";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import {
@@ -10,7 +13,6 @@ import {
   addProjectToSequenceAction,
   addProjectRevenueAction,
   addProjectCostAction,
-  addOfficeExpenseAction,
 } from "@/app/actions/projects";
 import type { LandProject } from "@/lib/projects";
 import { legacyVoucherRecords } from "@/lib/legacy-form-data";
@@ -83,10 +85,13 @@ type Props =
   | { mode: "entries"; project: LandProject; seqId: number };
 
 export function LandProjectForms(props: Props) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const today = new Date().toISOString().slice(0, 10);
 
   // ── Create sequence + P1 ──────────────────────────────────────────────────
   if (props.mode === "create-sequence") {
+    // Replaced standard Form action with manual handling for toast/silent load
     return (
       <form action={createProjectSequenceAction} className="form-grid form-grid--wide">
         {/* Sequence fields */}
@@ -98,15 +103,12 @@ export function LandProjectForms(props: Props) {
             required
           />
         </label>
-        <label className="space-y-2">
-          <span className="field-label">Initial running capital (TZS)</span>
-          <Input
-            name="initial_capital"
-            type="number"
-            placeholder="e.g. 50000000"
-            required
-          />
-        </label>
+        
+        {/*
+          Removed 'Initial running capital' field here. 
+          The backend automatically allocates 4,000,000 to the Sequence implicitly 
+          through the newly established Office Expense strategy.
+        */}
 
         {/* Divider */}
         <div
@@ -140,10 +142,9 @@ export function LandProjectForms(props: Props) {
         </label>
         <label className="space-y-2">
           <span className="field-label">Land cost (TZS)</span>
-          <Input
+          <FormattedNumberInput
             name="land_cost"
-            type="number"
-            placeholder="e.g. 45000000"
+            placeholder="e.g. 45,000,000"
             required
           />
         </label>
@@ -201,10 +202,9 @@ export function LandProjectForms(props: Props) {
           </label>
           <label className="space-y-2">
             <span className="field-label">Land cost (TZS)</span>
-            <Input
+            <FormattedNumberInput
               name="land_cost"
-              type="number"
-              placeholder="e.g. 50000000"
+              placeholder="e.g. 50,000,000"
               required
             />
           </label>
@@ -226,6 +226,26 @@ export function LandProjectForms(props: Props) {
       </div>
     );
   }
+
+  // Generic interceptor for asynchronous forms
+  const handleAsyncSubmit = async (
+    e: React.FormEvent<HTMLFormElement>,
+    actionFn: (formData: FormData) => Promise<{ success: boolean; error?: string }>
+  ) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    startTransition(async () => {
+      const result = await actionFn(formData);
+      if (result.success) {
+        toast.success("Entry added successfully");
+        form.reset();
+        router.refresh();
+      } else {
+        toast.error(result.error || "Failed to add entry");
+      }
+    });
+  };
 
   // ── Entry forms (revenue, costs, office expenses) ─────────────────────────
   return (
@@ -256,7 +276,7 @@ export function LandProjectForms(props: Props) {
             </div>
           </div>
           <form
-            action={addProjectRevenueAction}
+            onSubmit={(e) => handleAsyncSubmit(e, addProjectRevenueAction as any)}
             className="form-grid"
           >
             <input type="hidden" name="project_id" value={props.project.id} />
@@ -266,14 +286,14 @@ export function LandProjectForms(props: Props) {
             </label>
             <label className="space-y-2">
               <span className="field-label">Amount (TZS)</span>
-              <Input name="amount" type="number" placeholder="e.g. 85000000" required />
+              <FormattedNumberInput name="amount" placeholder="e.g. 85,000,000" required />
             </label>
             <label className="space-y-2">
               <span className="field-label">Date</span>
               <Input name="revenue_date" type="date" defaultValue={today} required />
             </label>
             <div className="button-row">
-              <Button type="submit" variant="outline">
+              <Button type="submit" variant="outline" disabled={isPending}>
                 Add Revenue
               </Button>
             </div>
@@ -296,71 +316,22 @@ export function LandProjectForms(props: Props) {
             </div>
           </div>
           <form
-            action={addProjectCostAction}
+            onSubmit={(e) => handleAsyncSubmit(e, addProjectCostAction as any)}
             className="form-grid"
           >
             <input type="hidden" name="project_id" value={props.project.id} />
             <LandCostCategoryFields />
             <label className="space-y-2">
               <span className="field-label">Amount (TZS)</span>
-              <Input name="amount" type="number" placeholder="e.g. 5000000" required />
+              <FormattedNumberInput name="amount" placeholder="e.g. 5,000,000" required />
             </label>
             <label className="space-y-2">
               <span className="field-label">Date</span>
               <Input name="cost_date" type="date" defaultValue={today} required />
             </label>
             <div className="button-row">
-              <Button type="submit" variant="outline">
+              <Button type="submit" variant="outline" disabled={isPending}>
                 Add Cost
-              </Button>
-            </div>
-          </form>
-        </section>
-
-        {/* Office Expenses */}
-        <section className="section-card">
-          <div className="section-head">
-            <div>
-              <span
-                className="eyebrow"
-                style={{ color: "#c4b5fd" }}
-              >
-                Step 3 · Office Expenses
-              </span>
-              <h3 className="section-title" style={{ fontSize: "1rem" }}>
-                Add Office Expense
-              </h3>
-            </div>
-          </div>
-          <form
-            action={addOfficeExpenseAction}
-            className="form-grid"
-          >
-            <input type="hidden" name="project_id" value={props.project.id} />
-            <label className="space-y-2">
-              <span className="field-label">Description</span>
-              <Input
-                name="description"
-                placeholder="e.g. Office rent, salaries"
-                required
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="field-label">Amount (TZS)</span>
-              <Input name="amount" type="number" placeholder="e.g. 3000000" required />
-            </label>
-            <label className="space-y-2">
-              <span className="field-label">Date</span>
-              <Input name="expense_date" type="date" defaultValue={today} required />
-            </label>
-            <div className="helper-panel">
-              Enter this project&apos;s share of office overhead for the 3-month
-              window. <strong>25%</strong> is deducted as allocation; remaining
-              75% represents the other three projects in the sequence.
-            </div>
-            <div className="button-row">
-              <Button type="submit" variant="outline">
-                Add Expense
               </Button>
             </div>
           </form>
