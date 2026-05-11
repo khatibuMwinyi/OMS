@@ -16,6 +16,7 @@ import {
   getNextLetterReferenceNumber,
   getNextPettyCashNumber,
 } from "@/lib/records";
+import { enforceBudgetForCategory } from "@/lib/projects";
 import {
   FIXED_BANK_ACCOUNT_NAME,
   FIXED_BANK_ACCOUNT_NUMBER,
@@ -929,6 +930,15 @@ export async function createPettyCashAction(formData: FormData) {
     );
   }
 
+  const budgetCheck = await enforceBudgetForCategory({
+    categoryName: parsed.data.description, // Matches budget item name
+    amount: parsed.data.amount,
+    date: parsed.data.date,
+  });
+  if (!budgetCheck.ok) {
+    goWithMessage("/petty-cash", "error", budgetCheck.reason);
+  }
+
   await execute(
     `INSERT INTO petty_cash_transactions (
       date, code, type, description, category, amount,
@@ -1088,6 +1098,15 @@ export async function createVoucherAction(formData: FormData) {
   const now = new Date().toISOString().slice(0, 19).replace("T", " ");
   const autoApprove = session.role === "admin";
 
+  const budgetCheck = await enforceBudgetForCategory({
+    categoryName: parsed.data.description, // Matches budget item name
+    amount: parsed.data.amount,
+    date: parsed.data.date,
+  });
+  if (!budgetCheck.ok) {
+    goWithMessage("/payment-vouchers", "error", budgetCheck.reason);
+  }
+
   await execute(
     `INSERT INTO payment_vouchers (
       voucher_number, date, customer_name, payment_method, bank_name, account_number,
@@ -1187,6 +1206,17 @@ export async function updateVoucherAction(formData: FormData) {
       "error",
       "Only rejected vouchers can be edited by secretary.",
     );
+  }
+
+  // Re-validate against budget; exclude this voucher's prior amount so it isn't double-counted.
+  const updateBudgetCheck = await enforceBudgetForCategory({
+    categoryName: parsed.data.description, // Matches budget item name
+    amount: parsed.data.amount,
+    date: parsed.data.date,
+    exclude: { voucherId: parsed.data.voucher_id },
+  });
+  if (!updateBudgetCheck.ok) {
+    goWithMessage("/payment-vouchers", "error", updateBudgetCheck.reason);
   }
 
   const paymentMethod = parsed.data.payment_method;

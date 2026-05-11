@@ -71,8 +71,23 @@ function toDateStr(d: Date) {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
+function safeDateStr(v: unknown) {
+  // Handle Date objects from MySQL driver ( duck-typed to avoid Turbopack instanceof issues)
+  if (
+    typeof v === "object" &&
+    v !== null &&
+    (v as Record<string, unknown>).toISOString !== undefined
+  ) {
+    return (v as Date).toISOString().slice(0, 10);
+  }
+  return String(v).slice(0, 10);
+}
 async function getProjectDateWindow(projectId: number) {
-  const rows = await queryRows<{ startsAt: string; endsAt: string; status: string }>(
+  const rows = await queryRows<{
+    startsAt: string | Date;
+    endsAt: string | Date;
+    status: string;
+  }>(
     `SELECT starts_at AS startsAt, ends_at AS endsAt, status
      FROM land_projects WHERE id = ? LIMIT 1`,
     [projectId],
@@ -80,14 +95,14 @@ async function getProjectDateWindow(projectId: number) {
   return rows[0] ?? null;
 }
 function assertEntryAllowed(
-  win: { startsAt: string; endsAt: string; status: string } | null,
+  win: { startsAt: unknown; endsAt: unknown; status: string } | null,
   entryDate: string,
 ) {
   if (!win) goWith("error", "Project not found.");
   if (win.status !== "active") goWith("error", "Cannot add entries to a non-active project.");
   const d = entryDate.slice(0, 10);
-  const s = String(win.startsAt).slice(0, 10);
-  const e = String(win.endsAt).slice(0, 10);
+  const s = safeDateStr(win.startsAt);
+  const e = safeDateStr(win.endsAt);
   if (d < s || d > e) goWith("error", `Date must be within project window (${s} → ${e}).`);
 }
 
@@ -99,7 +114,6 @@ export async function createProjectSequenceAction(formData: FormData) {
 
   const schema = z.object({
     sequence_name: z.string().min(1, "Sequence name is required"),
-    initial_capital: z.coerce.number().min(0),
     project_name: z.string().min(1, "Project name is required"),
     land_cost: z.coerce.number().min(0),
     description: z.string().optional(),
@@ -108,7 +122,6 @@ export async function createProjectSequenceAction(formData: FormData) {
 
   const parsed = schema.safeParse({
     sequence_name: str(formData.get("sequence_name")),
-    initial_capital: num(formData.get("initial_capital")),
     project_name: str(formData.get("project_name")),
     land_cost: num(formData.get("land_cost")),
     description: str(formData.get("description")) || undefined,
@@ -121,12 +134,15 @@ export async function createProjectSequenceAction(formData: FormData) {
 
   const startDate = parseLocalDate(parsed.data.start_date);
   const endDate = addMonths(startDate, 3);
+  
+  // Sequence implicitly uses 4M running capital logic now, no user input
+  const initialCapital = 0;
 
   const seqResult = await execute(
     `INSERT INTO land_project_sequences
      (name, initial_capital, current_capital, created_by)
      VALUES (?, ?, ?, ?)`,
-    [parsed.data.sequence_name, parsed.data.initial_capital, parsed.data.initial_capital, session.userId],
+    [parsed.data.sequence_name, initialCapital, initialCapital, session.userId],
   );
 
   const sequenceId = seqResult.insertId;
@@ -136,7 +152,7 @@ export async function createProjectSequenceAction(formData: FormData) {
      (sequence_id, name, description, land_cost, capital_before, project_number, starts_at, ends_at, created_by)
      VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
     [sequenceId, parsed.data.project_name, parsed.data.description ?? null,
-     parsed.data.land_cost, parsed.data.initial_capital,
+     parsed.data.land_cost, initialCapital,
      toDateStr(startDate), toDateStr(endDate), session.userId],
   );
 
@@ -222,10 +238,16 @@ export async function addProjectRevenueAction(formData: FormData) {
     revenue_date: str(formData.get("revenue_date")),
   });
 
-  if (!parsed.success) goWith("error", parsed.error.issues[0]?.message ?? "Invalid data");
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
 
   const win = await getProjectDateWindow(parsed.data.project_id);
-  assertEntryAllowed(win, parsed.data.revenue_date);
+  
+  try {
+    assertEntryAllowed(win, parsed.data.revenue_date);
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+
   const seqId = await getSeqId(parsed.data.project_id);
   await execute(
     `INSERT INTO land_project_revenues (project_id, description, amount, revenue_date, created_by)
@@ -234,7 +256,7 @@ export async function addProjectRevenueAction(formData: FormData) {
   );
 
   revalidatePath(BASE);
-  goWith("status", "Revenue entry added.", `seq=${seqId}&project=${parsed.data.project_id}&tab=entries`);
+  return { success: true };
 }
 
 // ── Add project cost ──────────────────────────────────────────────────────────
@@ -259,10 +281,16 @@ export async function addProjectCostAction(formData: FormData) {
     cost_date: str(formData.get("cost_date")),
   });
 
-  if (!parsed.success) goWith("error", parsed.error.issues[0]?.message ?? "Invalid data");
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
 
   const win = await getProjectDateWindow(parsed.data.project_id);
-  assertEntryAllowed(win, parsed.data.cost_date);
+  
+  try {
+    assertEntryAllowed(win, parsed.data.cost_date);
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+
   const seqId = await getSeqId(parsed.data.project_id);
   await execute(
     `INSERT INTO land_project_costs (project_id, category, description, amount, cost_date, created_by)
@@ -271,7 +299,7 @@ export async function addProjectCostAction(formData: FormData) {
   );
 
   revalidatePath(BASE);
-  goWith("status", "Project cost added.", `seq=${seqId}&project=${parsed.data.project_id}&tab=entries`);
+  return { success: true };
 }
 
 // ── Record sequence-level office expense (with budget enforcement) ────────────
@@ -497,13 +525,16 @@ export async function deleteOfficeExpenseItemAction(formData: FormData) {
     `SELECT COUNT(*) AS count FROM office_expenses WHERE item_id = ?`,
     [id],
   );
-  if ((used?.count ?? 0) > 0) {
-    goAdmin("error", "Cannot delete: this item has recorded expenses.");
-  }
+  const hasExpenses = (used?.count ?? 0) > 0;
 
   await execute(`DELETE FROM office_expense_items WHERE id = ?`, [id]);
   revalidatePath(ADMIN_BASE);
-  goAdmin("status", "Item deleted.");
+
+  if (hasExpenses) {
+    goAdmin("status", "Item deleted. Note: it had recorded expenses.");
+  } else {
+    goAdmin("status", "Item deleted.");
+  }
 }
 
 // ── Office budgets (admin) ────────────────────────────────────────────────────
