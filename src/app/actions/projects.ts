@@ -5,10 +5,31 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { execute, queryRows } from "@/lib/db";
-import { computeFinancials, ensureProjectTables, type LandProject } from "@/lib/projects";
+import {
+  computeFinancials,
+  ensureProjectTables,
+  periodFromExpenseDate,
+  formatPeriodLabel,
+  sumTotalSpentForItem,
+  type LandProject,
+  type OfficeExpenseRecurrence,
+} from "@/lib/projects";
 import { getCurrentSession } from "@/lib/session-server";
 
 const BASE = "/projects/land";
+const ADMIN_BASE = "/admin/office-expenses";
+
+function goAdmin(type: "status" | "error", message: string, extra = ""): never {
+  const q = `${type}=${encodeURIComponent(message)}${extra ? `&${extra}` : ""}`;
+  redirect(`${ADMIN_BASE}?${q}`);
+}
+
+async function requireAdmin() {
+  const session = await getCurrentSession();
+  if (!session) redirect("/");
+  if (session.role !== "admin") redirect("/dashboard");
+  return session;
+}
 
 function goWith(type: "status" | "error", message: string, extra = ""): never {
   const q = `${type}=${encodeURIComponent(message)}${extra ? `&${extra}` : ""}`;
@@ -253,39 +274,288 @@ export async function addProjectCostAction(formData: FormData) {
   goWith("status", "Project cost added.", `seq=${seqId}&project=${parsed.data.project_id}&tab=entries`);
 }
 
-// ── Add office expense ────────────────────────────────────────────────────────
+// ── Record sequence-level office expense (with budget enforcement) ────────────
 
-export async function addOfficeExpenseAction(formData: FormData) {
+const fmtTZS = (n: number) => new Intl.NumberFormat("sw-TZ").format(Math.round(n));
+
+export async function recordOfficeExpenseAction(formData: FormData) {
   const session = await requireDirector();
   await ensureProjectTables();
 
   const schema = z.object({
-    project_id: z.coerce.number().int().positive(),
-    description: z.string().min(1, "Description required"),
+    sequence_id: z.coerce.number().int().positive(),
+    item_id: z.coerce.number().int().positive(),
     amount: z.coerce.number().positive("Amount must be positive"),
-    expense_date: z.string().min(1),
+    expense_date: z.string().min(1, "Date required"),
+    note: z.string().optional(),
   });
 
   const parsed = schema.safeParse({
-    project_id: str(formData.get("project_id")),
-    description: str(formData.get("description")),
+    sequence_id: str(formData.get("sequence_id")),
+    item_id: str(formData.get("item_id")),
     amount: num(formData.get("amount")),
     expense_date: str(formData.get("expense_date")),
+    note: str(formData.get("note")) || undefined,
   });
 
   if (!parsed.success) goWith("error", parsed.error.issues[0]?.message ?? "Invalid data");
 
-  const win = await getProjectDateWindow(parsed.data.project_id);
-  assertEntryAllowed(win, parsed.data.expense_date);
-  const seqId = await getSeqId(parsed.data.project_id);
-  await execute(
-    `INSERT INTO land_project_office_expenses (project_id, description, amount, expense_date, created_by)
-     VALUES (?, ?, ?, ?, ?)`,
-    [parsed.data.project_id, parsed.data.description, parsed.data.amount, parsed.data.expense_date, session.userId],
+  const [item] = await queryRows<{
+    id: number;
+    name: string;
+    recurrence: OfficeExpenseRecurrence;
+  }>(
+    `SELECT id, name, recurrence FROM office_expense_items WHERE id = ? LIMIT 1`,
+    [parsed.data.item_id],
+  );
+  if (!item) goWith("error", "Office expense item not found.");
+
+  const [seq] = await queryRows<{ id: number }>(
+    `SELECT id FROM land_project_sequences WHERE id = ? LIMIT 1`,
+    [parsed.data.sequence_id],
+  );
+  if (!seq) goWith("error", "Sequence not found.");
+
+  const period = periodFromExpenseDate(parsed.data.expense_date, item.recurrence);
+  const periodLabel = formatPeriodLabel(period.year, period.month);
+
+  const [budget] = await queryRows<{ limit_amount: number }>(
+    item.recurrence === "monthly"
+      ? `SELECT limit_amount FROM office_expense_budgets
+         WHERE item_id = ? AND period_year = ? AND period_month = ? LIMIT 1`
+      : `SELECT limit_amount FROM office_expense_budgets
+         WHERE item_id = ? AND period_year = ? AND period_month IS NULL LIMIT 1`,
+    item.recurrence === "monthly"
+      ? [item.id, period.year, period.month as number]
+      : [item.id, period.year],
   );
 
+  if (!budget) {
+    goWith(
+      "error",
+      `No budget set for ${item.name} (${periodLabel}). An admin must set a budget first.`,
+      `seq=${parsed.data.sequence_id}&tab=office`,
+    );
+  }
+
+  const limit = Number(budget.limit_amount);
+  const spent = await sumTotalSpentForItem(item.id, item.name, period.year, period.month);
+  const remaining = limit - spent;
+
+  if (parsed.data.amount > remaining) {
+    goWith(
+      "error",
+      `Budget exceeded: ${item.name} ${periodLabel} cap is TZS ${fmtTZS(limit)}, TZS ${fmtTZS(spent)} already recorded, can accept at most TZS ${fmtTZS(Math.max(0, remaining))}.`,
+      `seq=${parsed.data.sequence_id}&tab=office`,
+    );
+  }
+
+  await execute(
+    `INSERT INTO office_expenses
+      (sequence_id, item_id, amount, expense_date, note, created_by)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
+      parsed.data.sequence_id,
+      item.id,
+      parsed.data.amount,
+      parsed.data.expense_date,
+      parsed.data.note ?? null,
+      session.userId,
+    ],
+  );
+
+  const retained = remaining - parsed.data.amount;
   revalidatePath(BASE);
-  goWith("status", "Office expense added.", `seq=${seqId}&project=${parsed.data.project_id}&tab=entries`);
+  goWith(
+    "status",
+    `${item.name} ${periodLabel}: TZS ${fmtTZS(parsed.data.amount)} recorded. Retained: TZS ${fmtTZS(retained)}.`,
+    `seq=${parsed.data.sequence_id}&tab=office`,
+  );
+}
+
+export async function deleteOfficeExpenseAction(formData: FormData) {
+  await requireDirector();
+  await ensureProjectTables();
+
+  const parsed = z
+    .object({
+      id: z.coerce.number().int().positive(),
+      sequence_id: z.coerce.number().int().positive(),
+    })
+    .safeParse({
+      id: str(formData.get("id")),
+      sequence_id: str(formData.get("sequence_id")),
+    });
+  if (!parsed.success) goWith("error", "Invalid office expense id.");
+
+  const result = await execute(
+    `DELETE FROM office_expenses WHERE id = ? AND sequence_id = ?`,
+    [parsed.data.id, parsed.data.sequence_id],
+  );
+  if (result.affectedRows === 0) goWith("error", "Office expense not found.");
+
+  revalidatePath(BASE);
+  goWith("status", "Office expense deleted.", `seq=${parsed.data.sequence_id}&tab=office`);
+}
+
+// ── Office expense items (admin) ──────────────────────────────────────────────
+
+export async function createOfficeExpenseItemAction(formData: FormData) {
+  await requireDirector();
+  await ensureProjectTables();
+
+  const parsed = z
+    .object({
+      name: z.string().min(1, "Name required"),
+      recurrence: z.enum(["monthly", "yearly"]),
+      default_amount: z.coerce.number().min(0),
+    })
+    .safeParse({
+      name: str(formData.get("name")),
+      recurrence: str(formData.get("recurrence")),
+      default_amount: num(formData.get("default_amount")),
+    });
+  if (!parsed.success) goAdmin("error", parsed.error.issues[0]?.message ?? "Invalid data");
+
+  try {
+    await execute(
+      `INSERT INTO office_expense_items (name, recurrence, default_amount, sort_order)
+       VALUES (?, ?, ?, (SELECT COALESCE(MAX(sort_order),0)+1 FROM office_expense_items AS s))`,
+      [parsed.data.name, parsed.data.recurrence, parsed.data.default_amount],
+    );
+  } catch {
+    goAdmin("error", "Item name already exists.");
+  }
+
+  revalidatePath(ADMIN_BASE);
+  goAdmin("status", `Item "${parsed.data.name}" added.`);
+}
+
+export async function updateOfficeExpenseItemAction(formData: FormData) {
+  await requireDirector();
+  await ensureProjectTables();
+
+  const parsed = z
+    .object({
+      id: z.coerce.number().int().positive(),
+      name: z.string().min(1, "Name required"),
+      recurrence: z.enum(["monthly", "yearly"]),
+      default_amount: z.coerce.number().min(0),
+    })
+    .safeParse({
+      id: str(formData.get("id")),
+      name: str(formData.get("name")),
+      recurrence: str(formData.get("recurrence")),
+      default_amount: num(formData.get("default_amount")),
+    });
+  if (!parsed.success) goAdmin("error", parsed.error.issues[0]?.message ?? "Invalid data");
+
+  // If recurrence changes, drop budgets that no longer match (monthly↔yearly).
+  const [existing] = await queryRows<{ recurrence: OfficeExpenseRecurrence }>(
+    `SELECT recurrence FROM office_expense_items WHERE id = ? LIMIT 1`,
+    [parsed.data.id],
+  );
+  if (!existing) goAdmin("error", "Item not found.");
+
+  try {
+    await execute(
+      `UPDATE office_expense_items
+       SET name = ?, recurrence = ?, default_amount = ?
+       WHERE id = ?`,
+      [parsed.data.name, parsed.data.recurrence, parsed.data.default_amount, parsed.data.id],
+    );
+  } catch {
+    goAdmin("error", "Update failed (name may already exist).");
+  }
+
+  if (existing.recurrence !== parsed.data.recurrence) {
+    if (parsed.data.recurrence === "yearly") {
+      await execute(
+        `DELETE FROM office_expense_budgets WHERE item_id = ? AND period_month IS NOT NULL`,
+        [parsed.data.id],
+      );
+    } else {
+      await execute(
+        `DELETE FROM office_expense_budgets WHERE item_id = ? AND period_month IS NULL`,
+        [parsed.data.id],
+      );
+    }
+  }
+
+  revalidatePath(ADMIN_BASE);
+  goAdmin("status", `Item updated.`);
+}
+
+export async function deleteOfficeExpenseItemAction(formData: FormData) {
+  await requireDirector();
+  await ensureProjectTables();
+
+  const id = Number(str(formData.get("id")));
+  if (!id) goAdmin("error", "Invalid id.");
+
+  const [used] = await queryRows<{ count: number }>(
+    `SELECT COUNT(*) AS count FROM office_expenses WHERE item_id = ?`,
+    [id],
+  );
+  if ((used?.count ?? 0) > 0) {
+    goAdmin("error", "Cannot delete: this item has recorded expenses.");
+  }
+
+  await execute(`DELETE FROM office_expense_items WHERE id = ?`, [id]);
+  revalidatePath(ADMIN_BASE);
+  goAdmin("status", "Item deleted.");
+}
+
+// ── Office budgets (admin) ────────────────────────────────────────────────────
+
+export async function setOfficeBudgetAction(formData: FormData) {
+  const session = await requireAdmin();
+  await ensureProjectTables();
+
+  const parsed = z
+    .object({
+      item_id: z.coerce.number().int().positive(),
+      period_year: z.coerce.number().int().min(2000).max(2200),
+      period_month: z.union([z.coerce.number().int().min(1).max(12), z.literal("")]).optional(),
+      limit_amount: z.coerce.number().min(0),
+    })
+    .safeParse({
+      item_id: str(formData.get("item_id")),
+      period_year: str(formData.get("period_year")),
+      period_month: str(formData.get("period_month")),
+      limit_amount: num(formData.get("limit_amount")),
+    });
+  if (!parsed.success) goAdmin("error", parsed.error.issues[0]?.message ?? "Invalid data");
+
+  const [item] = await queryRows<{ recurrence: OfficeExpenseRecurrence; name: string }>(
+    `SELECT recurrence, name FROM office_expense_items WHERE id = ? LIMIT 1`,
+    [parsed.data.item_id],
+  );
+  if (!item) goAdmin("error", "Item not found.");
+
+  const month = parsed.data.period_month === "" || parsed.data.period_month == null
+    ? null
+    : Number(parsed.data.period_month);
+
+  if (item.recurrence === "monthly" && month == null) {
+    goAdmin("error", `${item.name} is monthly — a month (1-12) is required.`);
+  }
+  if (item.recurrence === "yearly" && month != null) {
+    goAdmin("error", `${item.name} is yearly — month must be empty.`);
+  }
+
+  await execute(
+    `INSERT INTO office_expense_budgets
+       (item_id, period_year, period_month, limit_amount, created_by)
+     VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE limit_amount = VALUES(limit_amount)`,
+    [parsed.data.item_id, parsed.data.period_year, month, parsed.data.limit_amount, session.userId],
+  );
+
+  revalidatePath(ADMIN_BASE);
+  revalidatePath(BASE);
+  const label = month == null ? `${parsed.data.period_year}` : `${parsed.data.period_year}-${String(month).padStart(2, "0")}`;
+  goAdmin("status", `Budget for ${item.name} ${label} set.`, `year=${parsed.data.period_year}`);
 }
 
 // ── Complete project (calculates financials, updates capital) ─────────────────
@@ -310,10 +580,14 @@ export async function completeProjectAction(formData: FormData) {
   if (!project) goWith("error", "Project not found.");
   if (project.status === "completed") goWith("error", "Project is already completed.");
 
-  const [revenues, costs, oe] = await Promise.all([
+  const [revenues, costs, seqOe, seqRow] = await Promise.all([
     queryRows<{ amount: number }>(`SELECT amount FROM land_project_revenues WHERE project_id = ?`, [projectId]),
     queryRows<{ amount: number }>(`SELECT amount FROM land_project_costs WHERE project_id = ?`, [projectId]),
-    queryRows<{ amount: number }>(`SELECT amount FROM land_project_office_expenses WHERE project_id = ?`, [projectId]),
+    queryRows<{ amount: number }>(`SELECT amount FROM office_expenses WHERE sequence_id = ?`, [project.sequenceId]),
+    queryRows<{ totalProjects: number }>(
+      `SELECT total_projects AS totalProjects FROM land_project_sequences WHERE id = ? LIMIT 1`,
+      [project.sequenceId],
+    ),
   ]);
 
   const totalRevenue = revenues.reduce((s, r) => s + Number(r.amount), 0);
@@ -323,8 +597,9 @@ export async function completeProjectAction(formData: FormData) {
 
   const landCost = Number(project.landCost);
   const projectCosts = costs.reduce((s, c) => s + Number(c.amount), 0);
-  const officeTotal = oe.reduce((s, e) => s + Number(e.amount), 0);
+  const officeTotal = seqOe.reduce((s, e) => s + Number(e.amount), 0);
   const capitalBefore = Number(project.capitalBefore);
+  const N = Math.max(1, Number(seqRow[0]?.totalProjects ?? 4));
 
   const f = computeFinancials({
     totalRevenue,
@@ -332,6 +607,7 @@ export async function completeProjectAction(formData: FormData) {
     projectCosts,
     officeExpensesTotal: officeTotal,
     capitalBefore,
+    officeShareRatio: 1 / N,
   });
 
   await execute(

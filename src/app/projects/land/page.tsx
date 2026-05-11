@@ -9,14 +9,18 @@ import {
   listProjectsBySequence,
   listProjectRevenues,
   listProjectCosts,
-  listProjectOfficeExpenses,
+  listOfficeExpensesBySequence,
+  listOfficeExpenseItems,
   calculateProjectReport,
+  computeAnnualOfficeBurden,
   ensureProjectTables,
   type LandProject,
   type ProjectFinancialReport,
 } from "@/lib/projects";
 import { LandProjectForms } from "@/components/projects/LandProjectForms";
+import { OfficeItemsPanel } from "@/components/projects/OfficeItemsPanel";
 import { completeProjectAction } from "@/app/actions/projects";
+import { OfficeExpensePanel } from "@/components/projects/OfficeExpensePanel";
 
 type Props = {
   searchParams: Promise<{
@@ -62,21 +66,39 @@ export default async function LandProjectPage({ searchParams }: Props) {
   const selectedProject =
     projects.find((p) => p.id === selectedProjectId) ?? projects[0] ?? null;
 
+  // Sequence-level office expenses + master items list
+  const seqOfficeExpenses = activeSeqId
+    ? await listOfficeExpensesBySequence(activeSeqId)
+    : [];
+  const officeItems = await listOfficeExpenseItems();
+  const seqOfficeTotal = seqOfficeExpenses.reduce((s, e) => s + Number(e.amount), 0);
+  const N = activeSeq ? Math.max(1, Number(activeSeq.totalProjects)) : 4;
+
   // Build financial reports for all projects in sequence
   const reports: ProjectFinancialReport[] = [];
   for (const proj of projects) {
-    const [revs, costs, oe] = await Promise.all([
+    const [revs, costs] = await Promise.all([
       listProjectRevenues(proj.id),
       listProjectCosts(proj.id),
-      listProjectOfficeExpenses(proj.id),
     ]);
-    reports.push(calculateProjectReport(proj, revs, costs, oe));
+    // Active projects: use sequence-level office expenses; completed projects use snapshot.
+    const officeForCalc =
+      proj.status === "completed" ? [] : [{ amount: seqOfficeTotal }];
+    reports.push(
+      calculateProjectReport(proj, revs, costs, officeForCalc, {
+        sequenceTotalProjects: N,
+      }),
+    );
   }
 
   const totalLandCost = projects.reduce((s, p) => s + Number(p.landCost), 0);
   const totalOfficeAlloc = reports.reduce((s, r) => s + r.officeAllocation, 0);
   const latestReport = reports.find((r) => r.projectId === selectedProject?.id);
   const runningCapital = activeSeq ? Number(activeSeq.currentCapital) : 0;
+
+  // Annual office burden (sum monthly × 12 + sum yearly) and per-project share
+  const burden = computeAnnualOfficeBurden(officeItems);
+  const annualPerProjectShare = burden.annual / N;
 
   const tab = params.tab ?? "overview";
   const showCreate = params.create === "1";
@@ -132,7 +154,9 @@ export default async function LandProjectPage({ searchParams }: Props) {
           <div className="stat-card section-card">
             <p className="stat-label">Office Allocation</p>
             <p className="stat-value">TZS {fmt(totalOfficeAlloc)}</p>
-            <p className="stat-detail">25% of office expenses</p>
+            <p className="stat-detail">
+              {((1 / N) * 100).toFixed(0)}% × recorded office expenses (1/{N})
+            </p>
           </div>
           <div className="stat-card section-card">
             <p className="stat-label">Net Profit</p>
@@ -149,6 +173,35 @@ export default async function LandProjectPage({ searchParams }: Props) {
                 ? `${activeSeq.completedProjects} of ${activeSeq.totalProjects} complete`
                 : "no active sequence"}
             </p>
+          </div>
+        </section>
+
+        {/* ── Annual office burden card row ── */}
+        <section className="summary-grid" style={{ marginTop: 12 }}>
+          <div className="stat-card section-card">
+            <p className="stat-label">Annual Office Burden</p>
+            <p className="stat-value">TZS {fmt(burden.annual)}</p>
+            <p className="stat-detail">
+              monthly × 12 (TZS {fmt(burden.monthlySum * 12)}) + yearly (TZS{" "}
+              {fmt(burden.yearlySum)})
+            </p>
+          </div>
+          <div className="stat-card section-card">
+            <p className="stat-label">Per Project Annual Share</p>
+            <p className="stat-value">TZS {fmt(annualPerProjectShare)}</p>
+            <p className="stat-detail">
+              1/{N} = {((1 / N) * 100).toFixed(0)}% of annual burden
+            </p>
+          </div>
+          <div className="stat-card section-card">
+            <p className="stat-label">Monthly items</p>
+            <p className="stat-value">TZS {fmt(burden.monthlySum)}/mo</p>
+            <p className="stat-detail">{officeItems.filter((i) => i.recurrence === "monthly").length} items</p>
+          </div>
+          <div className="stat-card section-card">
+            <p className="stat-label">Yearly items</p>
+            <p className="stat-value">TZS {fmt(burden.yearlySum)}/yr</p>
+            <p className="stat-detail">{officeItems.filter((i) => i.recurrence === "yearly").length} items</p>
           </div>
         </section>
 
@@ -224,6 +277,8 @@ export default async function LandProjectPage({ searchParams }: Props) {
                   { key: "flow", label: "Financial Flow" },
                   { key: "report", label: "Full Report" },
                   { key: "entries", label: "Add Entry" },
+                  { key: "office", label: "Office Expenses" },
+                  { key: "office-items", label: "Office Items" },
                   { key: "add-project", label: "+ Next Project" },
                 ] as const
               ).map(({ key, label }) => (
@@ -367,18 +422,25 @@ export default async function LandProjectPage({ searchParams }: Props) {
                             </div>
                           </Link>
 
-                          {/* Complete button - outside Link */}
-                          {proj.status === "active" && (
-                            <form
-                              action={completeProjectAction}
-                              style={{ marginTop: 10 }}
+                          {/* Action buttons - outside Link */}
+                          <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                            <a
+                              href={`/api/export/land-project/${proj.id}`}
+                              className="button-ghost"
+                              target="_blank"
+                              rel="noopener"
                             >
-                              <input type="hidden" name="project_id" value={proj.id} />
-                              <button type="submit" className="button-secondary">
-                                Mark as Complete
-                              </button>
-                            </form>
-                          )}
+                              ↓ Download Report
+                            </a>
+                            {proj.status === "active" && (
+                              <form action={completeProjectAction}>
+                                <input type="hidden" name="project_id" value={proj.id} />
+                                <button type="submit" className="button-secondary">
+                                  Mark as Complete
+                                </button>
+                              </form>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -475,6 +537,25 @@ export default async function LandProjectPage({ searchParams }: Props) {
               </div>
             )}
 
+            {/* ── TAB: Office Expenses (sequence-level) ── */}
+            {tab === "office" && activeSeqId && (
+              <OfficeExpensePanel
+                sequenceId={activeSeqId}
+                sequenceTotalProjects={N}
+                items={officeItems}
+                entries={seqOfficeExpenses}
+                canDelete={session.role === "admin" || session.role === "director"}
+              />
+            )}
+
+            {/* ── TAB: Office Items (master items) ── */}
+            {tab === "office-items" && (
+              <OfficeItemsPanel
+                items={officeItems}
+                canEdit={session.role === "admin" || session.role === "director"}
+              />
+            )}
+
             {/* ── TAB: Add Next Project ── */}
             {tab === "add-project" && (
               <div>
@@ -566,14 +647,24 @@ function FinancialFlowView({
           <span className="eyebrow">P{report.projectNumber} · {report.projectName}</span>
           <h2 className="section-title">Financial Flow</h2>
         </div>
-        {project.status === "active" && (
-          <form action={completeProjectAction}>
-            <input type="hidden" name="project_id" value={project.id} />
-            <button type="submit" className="button-secondary">
-              Mark Complete
-            </button>
-          </form>
-        )}
+        <div style={{ display: "flex", gap: 8 }}>
+          <a
+            href={`/api/export/land-project/${project.id}`}
+            className="button-ghost"
+            target="_blank"
+            rel="noopener"
+          >
+            ↓ Download Report
+          </a>
+          {project.status === "active" && (
+            <form action={completeProjectAction}>
+              <input type="hidden" name="project_id" value={project.id} />
+              <button type="submit" className="button-secondary">
+                Mark Complete
+              </button>
+            </form>
+          )}
+        </div>
       </div>
 
       <div className="approval-row" style={{ display: "grid", gap: 0, padding: 0 }}>

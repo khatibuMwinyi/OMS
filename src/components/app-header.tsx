@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart2,
+  Building2,
   ChevronDown,
   ClipboardList,
   FileText,
@@ -45,6 +46,7 @@ const staffNavigation = [
 const adminNavigation = [
   { href: "/admin/users", label: "User Management", icon: UsersRound },
   { href: "/admin/categories", label: "Categories", icon: Tags },
+  { href: "/admin/office-expenses", label: "Office Expenses", icon: Building2 },
 ];
 
 const projectCategories = [
