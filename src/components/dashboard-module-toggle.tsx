@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
@@ -19,20 +19,6 @@ export function DashboardModuleToggle({
   defaultModule = "invoices",
 }: DashboardModuleToggleProps) {
   const [selectedModule, setSelectedModule] = useState(defaultModule);
-
-  useEffect(() => {
-    const sections = document.querySelectorAll<HTMLElement>(
-      "[data-dashboard-module]",
-    );
-
-    sections.forEach((section) => {
-      if (section.dataset.dashboardModule === selectedModule) {
-        section.classList.remove("hidden");
-      } else {
-        section.classList.add("hidden");
-      }
-    });
-  }, [selectedModule]);
 
   return (
     <div className="space-y-3">
