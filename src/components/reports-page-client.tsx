@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useActionState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BadgeCheck,
@@ -123,6 +123,12 @@ type Props = {
   filterSearchParams: { date: string; month: string; week: string };
 };
 
+type ApprovalState = {
+  message?: string;
+  type?: "status" | "error";
+  token?: string;
+} | null;
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function ReportsPageClient({
@@ -138,6 +144,7 @@ export function ReportsPageClient({
   filterSearchParams,
 }: Props) {
   const router = useRouter();
+  const [activeModuleState, setActiveModuleState] = useState<ReportModule>(activeModule);
   const [period, setPeriod] = useState<ReportPeriod>(initialPeriod);
   const [selectedDate, setSelectedDate] = useState(
     filterSearchParams.date || new Date().toISOString().slice(0, 10),
@@ -151,13 +158,13 @@ export function ReportsPageClient({
   const canApprove =
     session.role === "admin" || session.role === "director";
   const showApprovalSection =
-    canApprove && MODULES_NEEDING_APPROVAL.includes(activeModule);
+    canApprove && MODULES_NEEDING_APPROVAL.includes(activeModuleState);
 
-  const currentConfig = MODULE_CONFIG.find((m) => m.key === activeModule)!;
+  const currentConfig = MODULE_CONFIG.find((m) => m.key === activeModuleState)!;
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
-  function buildFilterParams(module = activeModule) {
+  function buildFilterParams(module = activeModuleState) {
     const p = new URLSearchParams();
     p.set("module", module);
     if (period !== "all") p.set("period", period);
@@ -182,10 +189,6 @@ export function ReportsPageClient({
     return p.toString();
   }
 
-  function navigateToModule(module: ReportModule) {
-    router.push(`/reports?module=${module}`);
-  }
-
   function applyFilter() {
     const params = buildFilterParams();
     router.replace(`/reports?${params.toString()}`, { scroll: false });
@@ -203,7 +206,7 @@ export function ReportsPageClient({
     const filterP = buildFilterParams();
     filterP.delete("module");
     const qs = filterP.toString();
-    const href = qs ? `${endpoints[activeModule]}?${qs}` : endpoints[activeModule];
+    const href = qs ? `${endpoints[activeModuleState]}?${qs}` : endpoints[activeModuleState];
 
     setIsDownloading(true);
     toast.loading("Preparing download...", { id: "report-dl" });
@@ -248,12 +251,12 @@ export function ReportsPageClient({
       {/* Module Selector Grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {MODULE_CONFIG.map(({ key, label, eyebrow, icon: Icon }) => {
-          const isActive = key === activeModule;
+          const isActive = key === activeModuleState;
           return (
             <button
               key={key}
               type="button"
-              onClick={() => navigateToModule(key)}
+              onClick={() => setActiveModuleState(key)}
               className={[
                 "section-card p-4 text-left transition-all duration-200",
                 "hover:-translate-y-0.5 hover:shadow-lift",
@@ -287,11 +290,11 @@ export function ReportsPageClient({
             <h2 className="section-title mt-1">{currentConfig.label}</h2>
           </div>
           <Badge variant="secondary">
-            {activeModule === "invoices" && invoices.length}
-            {activeModule === "receipts" && receipts.length}
-            {activeModule === "petty-cash" && pettyCash.length}
-            {activeModule === "payment-vouchers" && vouchers.length}
-            {activeModule === "letters" && letters.length}{" "}
+            {activeModuleState === "invoices" && invoices.length}
+            {activeModuleState === "receipts" && receipts.length}
+            {activeModuleState === "petty-cash" && pettyCash.length}
+            {activeModuleState === "payment-vouchers" && vouchers.length}
+            {activeModuleState === "letters" && letters.length}{" "}
             records
           </Badge>
         </div>
@@ -387,19 +390,19 @@ export function ReportsPageClient({
 
         {/* Data Table */}
         <div className="p-5">
-          {activeModule === "invoices" && (
+          {activeModuleState === "invoices" && (
             <InvoicesTable records={invoices} session={session} />
           )}
-          {activeModule === "receipts" && (
+          {activeModuleState === "receipts" && (
             <ReceiptsTable records={receipts} session={session} />
           )}
-          {activeModule === "petty-cash" && (
+          {activeModuleState === "petty-cash" && (
             <PettyCashTable records={pettyCash} />
           )}
-          {activeModule === "payment-vouchers" && (
+          {activeModuleState === "payment-vouchers" && (
             <VouchersTable records={vouchers} session={session} />
           )}
-          {activeModule === "letters" && (
+          {activeModuleState === "letters" && (
             <LettersTable records={letters} session={session} />
           )}
         </div>
@@ -410,36 +413,36 @@ export function ReportsPageClient({
             <div className="mt-5 mb-3 flex items-center gap-3">
               <BadgeCheck size={16} className="text-accent" />
               <h3 className="section-title !text-base">Pending Approvals</h3>
-              {activeModule === "petty-cash" && (
+              {activeModuleState === "petty-cash" && (
                 <Badge variant="warning">
                   {pettyCash.filter((r) => r.status === "pending").length} pending
                 </Badge>
               )}
-              {activeModule === "payment-vouchers" && (
+              {activeModuleState === "payment-vouchers" && (
                 <Badge variant="warning">
                   {vouchers.filter((r) => r.status === "pending").length} pending
                 </Badge>
               )}
-              {activeModule === "letters" && (
+              {activeModuleState === "letters" && (
                 <Badge variant="warning">
                   {letters.filter((r) => r.status === "pending").length} pending
                 </Badge>
               )}
             </div>
 
-            {activeModule === "petty-cash" && (
+            {activeModuleState === "petty-cash" && (
               <PettyCashApprovals
                 items={pettyCash.filter((r) => r.status === "pending")}
                 periodParams={periodParamsString()}
               />
             )}
-            {activeModule === "payment-vouchers" && (
+            {activeModuleState === "payment-vouchers" && (
               <VoucherApprovals
                 items={vouchers.filter((r) => r.status === "pending")}
                 periodParams={periodParamsString()}
               />
             )}
-            {activeModule === "letters" && (
+            {activeModuleState === "letters" && (
               <LetterApprovals
                 items={letters.filter((r) => r.status === "pending")}
                 periodParams={periodParamsString()}
@@ -787,6 +790,18 @@ function PettyCashApprovals({
   items: PettyCashRecord[];
   periodParams: string;
 }) {
+  const [state, formAction] = useActionState(approvePettyCashFromReports, null);
+  const prevToken = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (state?.message && state.token !== prevToken.current) {
+      prevToken.current = state.token ?? null;
+      toast(state.type === "error" ? state.message : state.message, {
+        icon: state.type === "error" ? "❌" : "✅",
+      });
+    }
+  }, [state]);
+
   if (!items.length) {
     return (
       <div className="empty-state">All petty cash records are up to date. Nothing pending.</div>
@@ -794,73 +809,52 @@ function PettyCashApprovals({
   }
 
   return (
-    <div className="record-table-wrapper">
-      <table className="record-table">
-        <thead>
-          <tr>
-            <th>Voucher</th>
-            <th>Date</th>
-            <th>Category</th>
-            <th>Description</th>
-            <th className="text-right">Amount</th>
-            <th className="text-right">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={item.id}>
-              <td className="font-semibold">
-                {item.pettycashNumber || item.code || `#${item.id}`}
-              </td>
-              <td>{formatDate(item.date)}</td>
-              <td>{item.category}</td>
-              <td className="max-w-[180px] truncate">{item.description}</td>
-              <td className="text-right font-semibold">
-                {formatTZS(Number(item.amount ?? 0))}
-              </td>
-              <td className="text-right">
-                <form
-                  action={approvePettyCashFromReports}
-                  className="flex flex-col items-end gap-2"
-                >
-                  <input type="hidden" name="petty_cash_id" value={item.id} />
-                  <input
-                    type="hidden"
-                    name="_period_params"
-                    value={periodParams}
-                  />
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="submit"
-                      name="status"
-                      value="approved"
-                      variant="secondary"
-                      size="sm"
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      type="submit"
-                      name="status"
-                      value="rejected"
-                      variant="destructive"
-                      size="sm"
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                  <Textarea
-                    name="comment"
-                    placeholder="Rejection comment (required to reject)"
-                    className="min-h-[56px] w-full max-w-[260px] text-xs"
-                  />
-                </form>
-              </td>
+    <form action={formAction}>
+      <input type="hidden" name="_period_params" value={periodParams} />
+      <div className="record-table-wrapper">
+        <table className="record-table">
+          <thead>
+            <tr>
+              <th>Voucher</th>
+              <th>Date</th>
+              <th>Category</th>
+              <th>Description</th>
+              <th className="text-right">Amount</th>
+              <th className="text-right">Action</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id}>
+                <td className="font-semibold">
+                  {item.pettycashNumber || item.code || `#${item.id}`}
+                </td>
+                <td>{formatDate(item.date)}</td>
+                <td>{item.category}</td>
+                <td className="max-w-[180px] truncate">{item.description}</td>
+                <td className="text-right font-semibold">
+                  {formatTZS(Number(item.amount ?? 0))}
+                </td>
+                <td className="text-right">
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex items-center gap-2">
+                      <input type="hidden" name="petty_cash_id" value={item.id} />
+                      <Button type="submit" name="status" value="approved" variant="secondary" size="sm">
+                        Approve
+                      </Button>
+                      <Button type="submit" name="status" value="rejected" variant="destructive" size="sm">
+                        Reject
+                      </Button>
+                    </div>
+                    <Textarea name="comment" placeholder="Rejection comment (required to reject)" className="min-h-[56px] w-full max-w-[260px] text-xs" />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </form>
   );
 }
 
@@ -873,80 +867,69 @@ function VoucherApprovals({
   items: VoucherRecord[];
   periodParams: string;
 }) {
+  const [state, formAction] = useActionState(approveVoucherFromReports, null);
+  const prevToken = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (state?.message && state.token !== prevToken.current) {
+      prevToken.current = state.token ?? null;
+      toast(state.type === "error" ? state.message : state.message, {
+        icon: state.type === "error" ? "❌" : "✅",
+      });
+    }
+  }, [state]);
+
   if (!items.length) {
     return (
-      <div className="empty-state">
-        All payment vouchers are processed. Nothing pending.
-      </div>
+      <div className="empty-state">All payment vouchers are processed. Nothing pending.</div>
     );
   }
 
   return (
-    <div className="record-table-wrapper">
-      <table className="record-table">
-        <thead>
-          <tr>
-            <th>Voucher</th>
-            <th>Date</th>
-            <th>Category</th>
-            <th>Description</th>
-            <th className="text-right">Amount</th>
-            <th className="text-right">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={item.id}>
-              <td className="font-semibold">{item.voucherNumber}</td>
-              <td>{formatDate(item.date)}</td>
-              <td>{item.category}</td>
-              <td className="max-w-[180px] truncate">{item.description}</td>
-              <td className="text-right font-semibold">
-                {formatTZS(Number(item.amount ?? 0))}
-              </td>
-              <td className="text-right">
-                <form
-                  action={approveVoucherFromReports}
-                  className="flex flex-col items-end gap-2"
-                >
-                  <input type="hidden" name="voucher_id" value={item.id} />
-                  <input
-                    type="hidden"
-                    name="_period_params"
-                    value={periodParams}
-                  />
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="submit"
-                      name="status"
-                      value="approved"
-                      variant="secondary"
-                      size="sm"
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      type="submit"
-                      name="status"
-                      value="rejected"
-                      variant="destructive"
-                      size="sm"
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                  <Textarea
-                    name="admin_comment"
-                    placeholder="Rejection comment (required to reject)"
-                    className="min-h-[56px] w-full max-w-[260px] text-xs"
-                  />
-                </form>
-              </td>
+    <form action={formAction}>
+      <input type="hidden" name="_period_params" value={periodParams} />
+      <div className="record-table-wrapper">
+        <table className="record-table">
+          <thead>
+            <tr>
+              <th>Voucher</th>
+              <th>Date</th>
+              <th>Category</th>
+              <th>Description</th>
+              <th className="text-right">Amount</th>
+              <th className="text-right">Action</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id}>
+                <td className="font-semibold">{item.voucherNumber}</td>
+                <td>{formatDate(item.date)}</td>
+                <td>{item.category}</td>
+                <td className="max-w-[180px] truncate">{item.description}</td>
+                <td className="text-right font-semibold">
+                  {formatTZS(Number(item.amount ?? 0))}
+                </td>
+                <td className="text-right">
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex items-center gap-2">
+                      <input type="hidden" name="voucher_id" value={item.id} />
+                      <Button type="submit" name="status" value="approved" variant="secondary" size="sm">
+                        Approve
+                      </Button>
+                      <Button type="submit" name="status" value="rejected" variant="destructive" size="sm">
+                        Reject
+                      </Button>
+                    </div>
+                    <Textarea name="admin_comment" placeholder="Rejection comment (required to reject)" className="min-h-[56px] w-full max-w-[260px] text-xs" />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </form>
   );
 }
 
@@ -959,6 +942,18 @@ function LetterApprovals({
   items: LetterRecord[];
   periodParams: string;
 }) {
+  const [state, formAction] = useActionState(approveLetterFromReports, null);
+  const prevToken = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (state?.message && state.token !== prevToken.current) {
+      prevToken.current = state.token ?? null;
+      toast(state.type === "error" ? state.message : state.message, {
+        icon: state.type === "error" ? "❌" : "✅",
+      });
+    }
+  }, [state]);
+
   if (!items.length) {
     return (
       <div className="empty-state">All letters are approved. Nothing pending.</div>
@@ -966,45 +961,41 @@ function LetterApprovals({
   }
 
   return (
-    <div className="record-table-wrapper">
-      <table className="record-table">
-        <thead>
-          <tr>
-            <th>Reference</th>
-            <th>Recipient</th>
-            <th>Subject</th>
-            <th>Created</th>
-            <th className="text-right">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={item.id}>
-              <td className="font-semibold">
-                {item.referenceNumber ?? `#${item.id}`}
-              </td>
-              <td>{item.name}</td>
-              <td className="max-w-[200px] truncate">
-                {item.heading ?? item.description ?? "—"}
-              </td>
-              <td>{formatDate(item.createdAt)}</td>
-              <td className="text-right">
-                <form action={approveLetterFromReports}>
+    <form action={formAction}>
+      <input type="hidden" name="_period_params" value={periodParams} />
+      <div className="record-table-wrapper">
+        <table className="record-table">
+          <thead>
+            <tr>
+              <th>Reference</th>
+              <th>Recipient</th>
+              <th>Subject</th>
+              <th>Created</th>
+              <th className="text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id}>
+                <td className="font-semibold">
+                  {item.referenceNumber ?? `#${item.id}`}
+                </td>
+                <td>{item.name}</td>
+                <td className="max-w-[200px] truncate">
+                  {item.heading ?? item.description ?? "—"}
+                </td>
+                <td>{formatDate(item.createdAt)}</td>
+                <td className="text-right">
                   <input type="hidden" name="letter_id" value={item.id} />
-                  <input
-                    type="hidden"
-                    name="_period_params"
-                    value={periodParams}
-                  />
                   <Button type="submit" variant="secondary" size="sm">
                     Approve
                   </Button>
-                </form>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </form>
   );
 }

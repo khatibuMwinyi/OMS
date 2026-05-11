@@ -11,14 +11,16 @@ import { execute, queryRows } from "@/lib/db";
 import { getCurrentSession } from "@/lib/session-server";
 import { ensurePettyCashStatusColumns } from "@/lib/records";
 
-function goWithMessage(
+function makeApprovalResult(
   module: string,
   type: "status" | "error",
   message: string,
-  extra?: string,
-): never {
-  const base = `/reports?module=${module}&${type}=${encodeURIComponent(message)}`;
-  redirect(extra ? `${base}&${extra}` : base);
+) {
+  return {
+    message,
+    type,
+    token: Math.random().toString(36).slice(2),
+  };
 }
 
 async function requireAdminOrDirector() {
@@ -64,7 +66,10 @@ const pettyCashSchema = z.object({
   _period_params: z.string().optional(),
 });
 
-export async function approvePettyCashFromReports(formData: FormData) {
+export async function approvePettyCashFromReports(
+  prevState: { message?: string; type?: "status" | "error"; token?: string } | null,
+  formData: FormData,
+) {
   const session = await requireAdminOrDirector();
   await ensurePettyCashStatusColumns();
 
@@ -76,12 +81,12 @@ export async function approvePettyCashFromReports(formData: FormData) {
   });
 
   if (!parsed.success) {
-    goWithMessage("petty-cash", "error", "Invalid approval request.");
+    return makeApprovalResult("petty-cash", "error", "Invalid approval request.");
   }
 
   const comment = parsed.data.comment?.trim() ?? "";
   if (parsed.data.status === "rejected" && !comment) {
-    goWithMessage("petty-cash", "error", "A comment is required when rejecting.");
+    return makeApprovalResult("petty-cash", "error", "A comment is required when rejecting.");
   }
 
   const now = new Date().toISOString().slice(0, 19).replace("T", " ");
@@ -109,12 +114,10 @@ export async function approvePettyCashFromReports(formData: FormData) {
   revalidatePath("/approvals");
   revalidatePath("/dashboard");
 
-  const extra = parsed.data._period_params ?? "";
-  goWithMessage(
+  return makeApprovalResult(
     "petty-cash",
     "status",
     parsed.data.status === "approved" ? "Petty cash record approved." : "Petty cash record rejected.",
-    extra,
   );
 }
 
@@ -127,7 +130,10 @@ const voucherSchema = z.object({
   _period_params: z.string().optional(),
 });
 
-export async function approveVoucherFromReports(formData: FormData) {
+export async function approveVoucherFromReports(
+  prevState: { message?: string; type?: "status" | "error"; token?: string } | null,
+  formData: FormData,
+) {
   const session = await requireAdminOrDirector();
 
   const parsed = voucherSchema.safeParse({
@@ -138,12 +144,12 @@ export async function approveVoucherFromReports(formData: FormData) {
   });
 
   if (!parsed.success) {
-    goWithMessage("payment-vouchers", "error", "Invalid approval request.");
+    return makeApprovalResult("payment-vouchers", "error", "Invalid approval request.");
   }
 
   const comment = parsed.data.admin_comment?.trim() ?? "";
   if (parsed.data.status === "rejected" && !comment) {
-    goWithMessage("payment-vouchers", "error", "A rejection comment is required.");
+    return makeApprovalResult("payment-vouchers", "error", "A rejection comment is required.");
   }
 
   const now = new Date().toISOString().slice(0, 19).replace("T", " ");
@@ -173,12 +179,10 @@ export async function approveVoucherFromReports(formData: FormData) {
   revalidatePath("/approvals");
   revalidatePath("/dashboard");
 
-  const extra = parsed.data._period_params ?? "";
-  goWithMessage(
+  return makeApprovalResult(
     "payment-vouchers",
     "status",
     parsed.data.status === "approved" ? "Voucher approved." : "Voucher rejected with comment.",
-    extra,
   );
 }
 
@@ -189,7 +193,10 @@ const letterSchema = z.object({
   _period_params: z.string().optional(),
 });
 
-export async function approveLetterFromReports(formData: FormData) {
+export async function approveLetterFromReports(
+  prevState: { message?: string; type?: "status" | "error"; token?: string } | null,
+  formData: FormData,
+) {
   const session = await requireAdminOrDirector();
 
   const parsed = letterSchema.safeParse({
@@ -198,7 +205,7 @@ export async function approveLetterFromReports(formData: FormData) {
   });
 
   if (!parsed.success) {
-    goWithMessage("letters", "error", "Invalid letter approval request.");
+    return makeApprovalResult("letters", "error", "Invalid letter approval request.");
   }
 
   const [adminUser] = await queryRows<{ signatureImagePath: string | null }>(
@@ -212,7 +219,7 @@ export async function approveLetterFromReports(formData: FormData) {
     "";
 
   if (!configuredPath) {
-    goWithMessage(
+    return makeApprovalResult(
       "letters",
       "error",
       "Admin signature is not configured. Set signature_image_path on your user account.",
@@ -222,7 +229,7 @@ export async function approveLetterFromReports(formData: FormData) {
   const resolvedPath = await resolveSignaturePath(configuredPath);
 
   if (!resolvedPath) {
-    goWithMessage("letters", "error", "Signature image file was not found on disk.");
+    return makeApprovalResult("letters", "error", "Signature image file was not found on disk.");
   }
 
   const result = await execute(
@@ -236,7 +243,7 @@ export async function approveLetterFromReports(formData: FormData) {
   );
 
   if (result.affectedRows === 0) {
-    goWithMessage("letters", "error", "Letter not found.");
+    return makeApprovalResult("letters", "error", "Letter not found.");
   }
 
   revalidatePath("/reports");
@@ -244,6 +251,5 @@ export async function approveLetterFromReports(formData: FormData) {
   revalidatePath("/approvals");
   revalidatePath("/dashboard");
 
-  const extra = parsed.data._period_params ?? "";
-  goWithMessage("letters", "status", "Letter approved successfully.", extra);
+  return makeApprovalResult("letters", "status", "Letter approved successfully.");
 }
